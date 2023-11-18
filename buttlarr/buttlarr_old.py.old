@@ -14,11 +14,6 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 
 
-_bad_request_poster_error_messages = [
-    "Wrong type of the web page content",
-    "Wrong file identifier/http url specified",
-    "Media_empty",
-]
 
 
 def insert_media(kind: str, update, context, reply_message, reply_markup, photo):
