@@ -38,6 +38,7 @@ class Database:
     def __init__(self, db_file=DEFAULT_PATH):
         self.db_file = Path(db_file)
         # Make sure the file exists
+        self.db_file.parent.mkdir(exist_ok=True, parents=True)
         self.db_file.touch(exist_ok=True)
         # Initialize the db
         self._init_db()

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Tuple, Optional, Any
 import requests
-from .database import Database
 from .telegram_handler import TelegramHandler
 
 KeyListType = Optional[List[Tuple[str, Optional[Any]]]]

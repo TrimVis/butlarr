@@ -1,7 +1,9 @@
 from loguru import logger
-from telegram import Updater
+from telegram import Update
+from telegram.ext import Application
 
-from .config import SERVICES, TELEGRAM_TOKEN
+from .database import Database
+from .config import SERVICES, TELEGRAM_TOKEN, START_COMMANDS
 
 
 def init():
@@ -9,28 +11,21 @@ def init():
 
 
 def main():
+    logger.info('Initializing database...')
+    db = Database()
+
     logger.info('Creating bot...')
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     logger.info('Registering help commands...')
     # TODO pjordan: Add this
 
     logger.info('Registering services..')
     for s in SERVICES:
-        def callback(update, context): s.handle_callback(update, context)
-        for cmd in s.commands:
-            updater.dispatcher.add_handler(CommandHandler(callback, cmd))
-
-    logger.info('Registering callback handler..')
-
-    def callback(update, context):
-        service = SERVICES[0]
-        service.handle_callback(update, context)
-    updater.dispatcher.add_handler(CallbackQueryHandler(callback))
+        s.register(application, db, START_COMMANDS)
 
     logger.info('Start polling for messages..')
-    updater.start_polling()
-    updater.idle()
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':

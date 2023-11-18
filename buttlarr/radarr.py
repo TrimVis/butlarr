@@ -2,14 +2,14 @@ from urllib.parse import quote
 from loguru import logger
 from typing import Optional, List, Any
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 from .common import Endpoints, EndpointKeys, ensure_keys, ArrService
-from .telegram_handler import command, authorized, subCommand, bad_request_poster_error_messages
+from .telegram_handler import command, authorized, subCommand, bad_request_poster_error_messages, handler
 
 
+@handler
 class Radarr(ArrService):
     def __init__(self, commands: List[str], api_host: str, api_key: str, kind="Radarr"):
         self.kind = kind
@@ -17,11 +17,11 @@ class Radarr(ArrService):
         self.api_key = api_key
 
         # Detect version and api_url
-        self.api_url = f"{api_host}/api/v3"
+        self.api_url = f"{api_host.rstrip('/')}/api/v3"
         self.api_version = ""
         status = self._get("system/status")
         if not status:
-            self.api_url = f"{api_host}/api"
+            self.api_url = f"{api_host.rstrip('/')}/api"
             status = self._get("system/status")
 
         assert status, 'Could not find version. Is the service down?'
