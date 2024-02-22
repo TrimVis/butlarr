@@ -29,7 +29,7 @@ class SessionDatabase:
     def get_session_entry(self, session_id, *, key=None):
         file_name = f"{session_id}.{key}" if key else session_id
         file_path = os.path.join(self.base_path, file_name)
-        with open(file_path, mode="wb+") as file:
+        with open(file_path, mode="rb+") as file:
             return pickle.load(file)
 
     def clear_session(self, session_id):

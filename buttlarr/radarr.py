@@ -11,6 +11,7 @@ from .telegram_handler import (
     command,
     authorized,
     subCommand,
+    subCallback,
     bad_request_poster_error_messages,
     handler,
     construct_command,
@@ -188,11 +189,11 @@ class Radarr(ArrService):
                 )
             ]
         elif not menu:
-            if not movie["id"]:
+            if not ("id" in movie and movie["id"]):
                 keyboard_act_row_0 += [
                     InlineKeyboardButton(
-                        f"Add {p}",
-                        callback_data=construct_command("add", index, p, wanted_tags),
+                        f"Add",
+                        callback_data=construct_command("add", index, "", wanted_tags),
                     )
                 ]
                 keyboard_act_row_1 += [
@@ -241,7 +242,7 @@ class Radarr(ArrService):
         keyboard_act_row_2 = [
             InlineKeyboardButton(
                 "Cancel",
-                callback_data="cancel",
+                callback_data=construct_command("cancel", index),
             ),
         ]
 
@@ -270,19 +271,30 @@ class Radarr(ArrService):
         reply_message = reply_message[0:1024]
 
         try:
-            await context.bot.sendPhoto(
-                chat_id=update.message.chat.id,
+            await context.bot.send_photo(
+                chat_id=(
+                    update.message.chat.id
+                    if update.message
+                    else update.callback_query.message.chat.id
+                ),
                 photo=movie["remotePoster"],
                 caption=reply_message,
                 reply_markup=keyboard_markup,
             )
+            if update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.message.delete()
         except BadRequest as e:
             if str(e) in bad_request_poster_error_messages:
                 logger.error(
                     f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
                 )
-                await context.bot.sendPhoto(
-                    chat_id=update.message.chat.id,
+                await context.bot.send_photo(
+                    chat_id=(
+                        update.message.chat.id
+                        if update.message
+                        else update.callback_query.message.chat.id
+                    ),
                     photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
                     caption=reply_message,
                     reply_markup=keyboard_markup,
@@ -302,22 +314,22 @@ class Radarr(ArrService):
 
         await self.reply(update, context, movies, 0)
 
-    @subCommand(cmd="goto")
+    @subCallback(cmd="goto")
     @authorized(min_auth_level=1)
     async def cmd_goto(self, update, context, args):
-        movie_id = args[0]
-        chat_id = update.message.chat.id
+        movie_id = int(args[0])
+        chat_id = update.callback_query.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
         await self.reply(update, context, movies, movie_id)
 
-    @subCommand(cmd="tags")
+    @subCallback(cmd="tags")
     @authorized(min_auth_level=1)
-    async def cmd_goto(self, update, context, args):
-        movie_id = args[0]
-        chat_id = update.message.chat.id
+    async def cmd_tags(self, update, context, args):
+        movie_id = int(args[0])
+        chat_id = update.callback_query.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
@@ -326,11 +338,11 @@ class Radarr(ArrService):
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
-    @subCommand(cmd="path")
+    @subCallback(cmd="path")
     @authorized(min_auth_level=1)
-    async def cmd_goto(self, update, context, args):
-        movie_id = args[0]
-        chat_id = update.message.chat.id
+    async def cmd_path(self, update, context, args):
+        movie_id = int(args[0])
+        chat_id = update.callback_query.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
@@ -339,12 +351,11 @@ class Radarr(ArrService):
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
-    @subCommand(cmd="add")
+    @subCallback(cmd="add")
     @authorized(min_auth_level=1)
-    async def cmd_add(self, update, context):
-        movie_id = args[0]
-
-        chat_id = update.message.chat.id
+    async def cmd_add(self, update, context, args):
+        movie_id = int(args[0])
+        chat_id = update.callback_query.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
@@ -357,27 +368,27 @@ class Radarr(ArrService):
         del movies
         self.session_db.clear_session(chat_id)
 
-        await update.query.message.reply_text("Movie added!")
+        await update.callback_query.message.reply_text("Movie added!")
 
-    @subCommand(cmd="remove")
+    @subCallback(cmd="remove")
     @authorized(min_auth_level=1)
-    async def cmd_remove(self, update, context):
+    async def cmd_remove(self, update, context, args):
         del context
-        chat_id = update.message.chat.id
+        chat_id = update.callback_query.message.chat.id
 
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        await update.query.message.reply_text("Movie removed!")
+        await update.callback_query.message.reply_text("Movie removed!")
 
-    @subCommand(cmd="cancel")
+    @subCallback(cmd="cancel")
     @authorized(min_auth_level=1)
-    async def cmd_cancel(self, update, context):
+    async def cmd_cancel(self, update, context, args):
         del context
-        chat_id = update.message.chat.id
+        chat_id = update.callback_query.message.chat.id
 
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        await update.query.message.reply_text("Search canceled")
-        await update.query.message.delete()
+        await update.callback_query.message.reply_text("Search canceled")
+        await update.callback_query.message.delete()
