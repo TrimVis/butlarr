@@ -114,7 +114,7 @@ class Radarr(ArrService):
 
     # TODO pjordan: Add quality selection
 
-    def reply(self, update, context, movies, index, menu=None, wanted_tags=[]):
+    async def reply(self, update, context, movies, index, menu=None, wanted_tags=[]):
         movie = movies[index]
 
         keyboard_nav_row = [
@@ -245,18 +245,22 @@ class Radarr(ArrService):
             ),
         ]
 
-        keyboard_markup = InlineKeyboardMarkup(
-            [
-                keyboard_nav_row,
-                keyboard_menu_row,
-                keyboard_act_row_0,
-                keyboard_act_row_1,
-                keyboard_act_row_2,
-            ]
-        )
+        keyboard = [
+            keyboard_nav_row,
+            keyboard_menu_row,
+            keyboard_act_row_0,
+            keyboard_act_row_1,
+            keyboard_act_row_2,
+        ]
+
+        # Ignore this ugly piece of code, we are just filtering out all Nones
+        keyboard = [[k for k in ks if k] for ks in keyboard if ks]
+        keyboard = [[k for k in ks if k] for ks in keyboard if ks]
+
+        keyboard_markup = InlineKeyboardMarkup(keyboard)
 
         reply_message = f"{movie['title']} "
-        if movie["year"] and movie["year"] not in movie["title"]:
+        if movie["year"] and str(movie["year"]) not in movie["title"]:
             reply_message += f"({movie['year']}) "
 
         if movie["runtime"]:
@@ -266,7 +270,7 @@ class Radarr(ArrService):
         reply_message = reply_message[0:1024]
 
         try:
-            context.bot.sendPhoto(
+            await context.bot.sendPhoto(
                 chat_id=update.message.chat.id,
                 photo=movie["remotePoster"],
                 caption=reply_message,
@@ -277,7 +281,7 @@ class Radarr(ArrService):
                 logger.error(
                     f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
                 )
-                context.bot.sendPhoto(
+                await context.bot.sendPhoto(
                     chat_id=update.message.chat.id,
                     photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
                     caption=reply_message,
@@ -288,56 +292,56 @@ class Radarr(ArrService):
 
     @command()
     @authorized(min_auth_level=1)
-    def cmd_default(self, update, context):
-        title = update.message.text
+    async def cmd_default(self, update, context, args):
+        title = " ".join(args[1:])
         chat_id = update.message.chat.id
 
         # Search movies and store the results in the session db
         movies = self.search(title) or []
         self.session_db.add_session_entry(chat_id, movies, key="movies")
 
-        self.reply(update, context, movies, 0)
+        await self.reply(update, context, movies, 0)
 
     @subCommand(cmd="goto")
     @authorized(min_auth_level=1)
-    def cmd_goto(self, update, context, args):
+    async def cmd_goto(self, update, context, args):
         movie_id = args[0]
         chat_id = update.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        self.reply(update, context, movies, movie_id)
+        await self.reply(update, context, movies, movie_id)
 
     @subCommand(cmd="tags")
     @authorized(min_auth_level=1)
-    def cmd_goto(self, update, context, args):
+    async def cmd_goto(self, update, context, args):
         movie_id = args[0]
         chat_id = update.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        self.reply(
+        await self.reply(
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
     @subCommand(cmd="path")
     @authorized(min_auth_level=1)
-    def cmd_goto(self, update, context, args):
+    async def cmd_goto(self, update, context, args):
         movie_id = args[0]
         chat_id = update.message.chat.id
 
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        self.reply(
+        await self.reply(
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
     @subCommand(cmd="add")
     @authorized(min_auth_level=1)
-    def cmd_add(self, update, context):
+    async def cmd_add(self, update, context):
         movie_id = args[0]
 
         chat_id = update.message.chat.id
@@ -353,27 +357,27 @@ class Radarr(ArrService):
         del movies
         self.session_db.clear_session(chat_id)
 
-        update.query.message.reply_text("Movie added!")
+        await update.query.message.reply_text("Movie added!")
 
     @subCommand(cmd="remove")
     @authorized(min_auth_level=1)
-    def cmd_remove(self, update, context):
+    async def cmd_remove(self, update, context):
         del context
         chat_id = update.message.chat.id
 
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        update.query.message.reply_text("Movie removed!")
+        await update.query.message.reply_text("Movie removed!")
 
     @subCommand(cmd="cancel")
     @authorized(min_auth_level=1)
-    def cmd_cancel(self, update, context):
+    async def cmd_cancel(self, update, context):
         del context
         chat_id = update.message.chat.id
 
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        update.query.message.reply_text("Search canceled")
-        update.query.message.delete()
+        await update.query.message.reply_text("Search canceled")
+        await update.query.message.delete()

@@ -27,7 +27,7 @@ def get_auth_handler(db: Database):
     return CommandHandler(AUTH_COMMAND, handler)
 
 
-def construct_command(args: List[str]):
+def construct_command(*args: List[str]):
     return (" ").join([f'"{arg}"' for arg in args])
 
 
@@ -46,7 +46,6 @@ def authorized(min_auth_level=None):
         async def wrapped_func(*args, **kwargs):
             # Ensure user is authorized
             update = args[1] if len(args) >= 2 else kwargs["update"]
-            print(update)
             uid = update.message.from_user.id
             auth_level = args[0].db.get_auth_level(uid)
             # TODO pjordan: Reenable this some time
@@ -56,7 +55,7 @@ def authorized(min_auth_level=None):
                 )
                 return
 
-            return func(*args, **kwargs)
+            return await func(*args, **kwargs)
 
         return wrapped_func
 
@@ -104,7 +103,7 @@ class TelegramHandler:
         for cmd in self.commands:
             application.add_handler(CommandHandler(cmd, self.handle_callback))
 
-    def default_callback(self, _update, _context):
+    async def default_callback(self, _update, _context):
         del _update, _context
         raise NotImplementedError
 
@@ -113,11 +112,11 @@ class TelegramHandler:
         if len(self.sub_commands) and len(args) > 1:
             for s, c in self.sub_commands:
                 if args[1] == s:
-                    c(self, update, context, args[1:])
+                    await c(self, update, context, args[1:])
                     return
 
         logger.debug("No matching subcommand registered. Trying fallback")
         try:
-            await self.default_callback(update, context)
+            await self.default_callback(update, context, args)
         except NotImplementedError:
             logger.error("No default command handler registered.")
