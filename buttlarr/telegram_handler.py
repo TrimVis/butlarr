@@ -1,9 +1,35 @@
+import shlex
+
 from typing import List, Tuple, Callable
 from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler
 
+from .config.commands import AUTH_COMMAND
+from .config.secrets import AUTH_PASSWORD
 from .database import Database
+
+
+def get_auth_handler(db: Database):
+    async def handler(update, context):
+        uid = update.message.from_user.id
+        name = update.message.from_user.name
+        pw_offset = len(AUTH_COMMAND) + 2
+        password = update.message.text[pw_offset:].strip()
+        if password == AUTH_PASSWORD:
+            db.add_user(uid, name, 1)
+            await update.message.reply_text(f"Authorized user {name}")
+            await update.message.delete()
+        else:
+            await update.message.reply_text(f"Wrong password")
+            await update.message.delete()
+
+    return CommandHandler(AUTH_COMMAND, handler)
+
+
+def construct_command(args: List[str]):
+    return (" ").join([f'"{arg}"' for arg in args])
+
 
 bad_request_poster_error_messages = [
     "Wrong type of the web page content",
@@ -17,21 +43,23 @@ def authorized(min_auth_level=None):
         assert min_auth_level, "Missing required arg min_auth_level"
 
         @wraps(func)
-        def wrapped_func(*args, **kwargs):
+        async def wrapped_func(*args, **kwargs):
             # Ensure user is authorized
-            update = args[2] if len(args) >= 2 else kwargs['update']
+            update = args[1] if len(args) >= 2 else kwargs["update"]
+            print(update)
             uid = update.message.from_user.id
             auth_level = args[0].db.get_auth_level(uid)
             # TODO pjordan: Reenable this some time
             if not auth_level or min_auth_level > auth_level and False:
-                update.message.reply_text(
-                    f"User not authorized for this command. \n Authorize using {' OR '.join([f'`/ {c} <password>`' for c in START_COMMANDS])}"
+                await update.message.reply_text(
+                    f"User not authorized for this command. \n Authorize using '/{AUTH_COMMAND} <password>'"
                 )
                 return
 
             return func(*args, **kwargs)
 
         return wrapped_func
+
     return decorator
 
 
@@ -39,6 +67,7 @@ def command():
     def decorator(func):
         func.main_cmd = True
         return func
+
     return decorator
 
 
@@ -48,6 +77,7 @@ def subCommand(cmd=None):
     def decorator(func):
         func.sub_cmd = cmd
         return func
+
     return decorator
 
 
@@ -66,13 +96,11 @@ def handler(cls):
 
 class TelegramHandler:
     db: Database
-    start_cmds: List[str]
     commands: List[str]
     sub_commands: List[Tuple[str, Callable]]
 
-    def register(self, application, db, start_cmds):
+    def register(self, application, db):
         self.db = db
-        self.start_cmds = start_cmds
         for cmd in self.commands:
             application.add_handler(CommandHandler(cmd, self.handle_callback))
 
@@ -80,16 +108,16 @@ class TelegramHandler:
         del _update, _context
         raise NotImplementedError
 
-    def handle_callback(self, update, context):
-        args = update.message.text.strip().split(' ')
+    async def handle_callback(self, update, context):
+        args = shlex.split(update.message.text.strip())
         if len(self.sub_commands) and len(args) > 1:
-            for (s, c) in self.sub_commands:
+            for s, c in self.sub_commands:
                 if args[1] == s:
                     c(self, update, context, args[1:])
                     return
 
         logger.debug("No matching subcommand registered. Trying fallback")
         try:
-            self.default_callback(update, context)
+            await self.default_callback(update, context)
         except NotImplementedError:
             logger.error("No default command handler registered.")

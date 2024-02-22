@@ -5,7 +5,7 @@ import sqlite3
 from threading import Lock
 
 DEFAULT_PATH = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "data", "searcharr.db"
+    Path(os.path.dirname(os.path.realpath(__file__))).parent, "data", "searcharr.db"
 )
 
 
@@ -70,8 +70,6 @@ class Database:
         try:
             with self.lock:
                 r = cur.execute(q, qa)
-                con.commit()
-                con.close()
                 return (r, con)
         except sqlite3.Error as e:
             logger.error(f"Error executing database query [{q}]: {e}")
@@ -81,18 +79,26 @@ class Database:
         q = "INSERT OR REPLACE INTO users (id, username, auth_level) VALUES (?, ?, ?);"
         qa = (id, username, auth_level)
         (_, con) = self._execute_query(q, qa)
+        con.commit()
         con.close()
 
     def remove_user(self, id):
         q = "DELETE FROM users where id=?;"
         qa = (id,)
         (_, con) = self._execute_query(q, qa)
+        con.commit()
         con.close()
 
-    def get_users(self, auth_level=None, min_auth_level=None,):
-        auth_check = (f'>= {min_auth_level}' if min_auth_level
-                      else f'== {auth_level}' if auth_level
-                      else '')
+    def get_users(
+        self,
+        auth_level=None,
+        min_auth_level=None,
+    ):
+        auth_check = (
+            f">= {min_auth_level}"
+            if min_auth_level
+            else f"== {auth_level}" if auth_level else ""
+        )
         q = f"SELECT * FROM users where auth_level {auth_check}"
         (r, con) = self._execute_query(q)
         records = r.fetchall() if r else []
@@ -104,6 +110,7 @@ class Database:
         q = "UPDATE users set auth_level=? where id=?;"
         qa = (auth_level, user_id)
         (_, con) = self._execute_query(q, qa)
+        con.commit()
         con.close()
 
     def get_auth_level(self, user_id):

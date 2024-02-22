@@ -5,210 +5,261 @@ from typing import Optional, List, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
-from .common import Endpoints, EndpointKeys, ensure_keys, ArrService
-from .telegram_handler import command, authorized, subCommand, bad_request_poster_error_messages, handler
+from .session_database import SessionDatabase
+from .common import ArrService, Action
+from .telegram_handler import (
+    command,
+    authorized,
+    subCommand,
+    bad_request_poster_error_messages,
+    handler,
+    construct_command,
+)
 
 
 @handler
 class Radarr(ArrService):
-    def __init__(self, commands: List[str], api_host: str, api_key: str, kind="Radarr"):
-        self.kind = kind
+    def __init__(
+        self,
+        commands: List[str],
+        api_host: str,
+        api_key: str,
+        allow_path_selection=True,
+        allow_tag_selection=True,
+        id="Radarr",
+    ):
+        self.session_db = SessionDatabase()
+
+        self.id = id
         self.commands = commands
         self.api_key = api_key
 
         # Detect version and api_url
         self.api_url = f"{api_host.rstrip('/')}/api/v3"
         self.api_version = ""
-        status = self._get("system/status")
+        status = self.request("system/status")
         if not status:
             self.api_url = f"{api_host.rstrip('/')}/api"
-            status = self._get("system/status")
+            status = self.request("system/status")
+            assert not status, "Only Radarr v3 is supported"
 
-        assert status, 'Could not find version. Is the service down?'
-        self.api_version = status.json().get('version', '')
+        assert status, "Could not find version. Is the service down?"
+        self.api_version = status.get("version", "")
 
-        self.endpoints = Endpoints(
-            status="system/status",
-            search="movie/lookup",
-            add="movie",
-            root_folders="RootFolder",
-            profiles=(
-                "qualityProfile"
-                if not self.api_version.startswith('0.')
-                else "profile"
-            ),
-            tag="tag",
-            add_tag="tag",
-        )
-        self.preserved_keys = EndpointKeys(
-            search=[
-                ("title", None),
-                ("overview", "No overview available"),
-                ("status", "Unknown status"),
-                ("inCinemas", None),
-                ("remotePoster", "https://artworks.thetvdb.com/banners/images/missing/movie.jpg",),
-                ("year", None),
-                ("tmdbId", None),
-                ("imdbId", None),
-                ("runtime", None),
-                ("id", None),
-                ("titleSlug", None),
-                ("images", None),
-            ],
-        )
         self.root_folders = self.get_root_folders()
+        self.allow_path_selection = allow_path_selection
+        self.allow_tag_selection = allow_tag_selection
 
-    def search(self, title: Optional[str] = None, tmdb_id: Optional[str] = None):
-        if tmdb_id:
-            return self._get_endpoint('search', {"term": f"tmdb:{tmdb_id}"}, [])
-        if title:
-            return self._get_endpoint('search', {"term": quote(title)}, [])
-        return []
+    def search(self, term: str = None, *, is_tmdb_id=False):
+        if not term:
+            return []
 
-    def add(self,
-            movie_info: Optional[Any] = None,
-            tmdb_id: Optional[str] = None,
-            search=True,
-            monitored=True,
-            min_avail="released",
-            quality_profile: str = '',
-            tags: List[str] = [],
-            root_folder: str = '',
-            ):
+        return self.request(
+            "movie/lookup",
+            params={"term": f"tmdb:{term}" if is_tmdb_id else term},
+            fallback=[],
+        )
 
-        if not movie_info and tmdb_id:
-            movie_infos = self.search(tmdb_id=tmdb_id)
-            if isinstance(movie_infos, list) and len(movie_infos):
-                movie_info = ensure_keys(movie_infos[0], [
-                    ("tmdbId", None),
-                    ("title", None),
-                    ("year", None),
-                    ("titleSlug", None),
-                    ("images", None)
-                ])
+    def add(
+        self,
+        movie=None,
+        *,
+        tmdb_id: Optional[str] = None,
+        min_availability="released",
+        quality_profile: str = "",
+        tags: List[str] = [],
+        root_folder: str = "",
+        monitored=True,
+        search_for_movie=True,
+    ):
+        assert (
+            movie or tmdb_id
+        ), "Missing required args! Either provide the movie object or the tmdb_id"
+        if not movie and tmdb_id:
+            movie = self.search(tmdb_id, is_tmdb_id=True)[0]
 
-        if not movie_info:
-            return False
-
-        return self._post_endpoint('add', {
-            **movie_info,
-            "qualityProfileId": quality_profile,
-            "rootFolderPath": root_folder,
-            "tags": tags,
-            "monitored": monitored,
-            "minimumAvailability": min_avail,
-            "tags": tags,
-            "addOptions": {"searchForMovie": search},
-        })
+        return self.request(
+            "movie",
+            action=Action.POST,
+            params={
+                **movie,
+                "qualityProfileId": quality_profile,
+                "rootFolderPath": root_folder,
+                "tags": tags,
+                "monitored": monitored,
+                "minimumAvailability": min_availability,
+                "addOptions": {"searchForMovie": search_for_movie},
+            },
+        )
 
     def get_root_folders(self) -> List[str]:
-        return self._get_endpoint('root_folders', fallback=[])
+        return self.request("rootfolder", fallback=[])
 
-    def get_all_tags(self):
-        return self._get_endpoint('tag', fallback=[])
+    def get_root_folder(self, id: str) -> List[str]:
+        return self.request(f"rootfolder/{id}", fallback={})
 
-    def get_filtered_tags(self, allowed_tags, excluded_tags):
-        if not allowed_tags == []:
-            return [
-                x
-                for x in self.get_all_tags() or []
-                if not x["label"].startswith("searcharr-")
-                and not x["label"] in excluded_tags
-            ]
+    def get_tags(self):
+        return self.request("tag", fallback=[])
 
-        return [
-            x
-            for x in self.get_all_tags() or []
-            if not x["label"].startswith("searcharr-")
-            and (x["label"] in allowed_tags or x["id"] in allowed_tags)
-            and x["label"] not in excluded_tags
-        ]
+    def get_tag(self, id: str):
+        return self.request(f"tag/{id}", fallback={})
 
     def add_tag(self, tag):
-        self._post_endpoint('add_tag', {'label': tag}, {})
-
-    def get_tag_id(self, tag: str):
-        all_tags = self.get_all_tags()
-        assert all_tags, "Failed to fetch all tags"
-        if tag_id := next(
-                iter([
-                    x.get("id") for x in all_tags
-                    if x.get("label", '').lower() == tag.lower()
-                ]), None,
-        ):
-            return tag_id
-        else:
-            res = self.add_tag(tag)
-            assert res, "Failed to add tag"
-            return res.get('id', None)
-
-    def lookup_quality_profile(self):
-        return self._get_endpoint('profiles')
-
-    def lookup_root_folder(self, v):
-        assert self.root_folders, "Root folders missing"
-        return next(
-            (x for x in self.root_folders if str(
-                v) in [x["path"], str(x["id"])]),
-            None,
+        return self.request(
+            "tag", action=Action.POST, params={"label": tag}, fallback={}
         )
+
+    def get_quality_profiles(self):
+        return self.request("qualityprofile", fallback=[])
 
     # TODO pjordan: Add quality selection
 
-    def reply(self, update, context, movie, index, total_results, menu=None):
-        keyboardNavRow = [(InlineKeyboardButton(
-            "⬅",
-            callback_data='prev'
-        ) if index > 0 else None),
-            InlineKeyboardButton(
-                "TMDB", url=f"https://www.themoviedb.org/movie/{movie['tmdbId']}"
-        ) if movie["tmdbId"] else None,
-            InlineKeyboardButton(
-                "IMDb", url=f"https://imdb.com/title/{movie['imdbId']}"
-        ) if movie["imdbId"] else None,
-            InlineKeyboardButton(
-                "➡",
-                callback_data="next",
-        ) if total_results > 1 and index < total_results - 1 else None,
+    def reply(self, update, context, movies, index, menu=None, wanted_tags=[]):
+        movie = movies[index]
+
+        keyboard_nav_row = [
+            (
+                InlineKeyboardButton(
+                    "⬅",
+                    callback_data=construct_command("goto", index - 1),
+                )
+                if index > 0
+                else None
+            ),
+            (
+                InlineKeyboardButton(
+                    "TMDB", url=f"https://www.themoviedb.org/movie/{movie['tmdbId']}"
+                )
+                if movie["tmdbId"]
+                else None
+            ),
+            (
+                InlineKeyboardButton(
+                    "IMDB", url=f"https://imdb.com/title/{movie['imdbId']}"
+                )
+                if movie["imdbId"]
+                else None
+            ),
+            (
+                InlineKeyboardButton(
+                    "➡",
+                    callback_data=construct_command("goto", index + 1),
+                )
+                if index < len(movies) - 1
+                else None
+            ),
         ]
 
-        keyboardMenuRow = None
-        if menu:
-            if menu == 'tags':
-                tags = self.get_all_tags() or []
-                keyboardMenuRow = [
-                    ([InlineKeyboardButton(
-                        f"Tag {tag}", callback_data="tag")] for tag in tags[:12]),
-                    [InlineKeyboardButton("Done", callback_data="add",)],
+        keyboard_menu_row = None
+        keyboard_act_row_0 = []
+        keyboard_act_row_1 = []
+        if menu == "tags":
+            tags = self.get_all_tags() or []
+            keyboard_menu_row = [
+                (
+                    [
+                        InlineKeyboardButton(
+                            f"Tag {tag}" if tag not in wanted_tags else f"Remove {tag}",
+                            callback_data=construct_command("tag", *wanted_tags, i),
+                        )
+                    ]
+                    for (i, tag) in enumerate(tags)
+                ),
+                [
+                    InlineKeyboardButton(
+                        "Done",
+                        callback_data=construct_command("add", index, p, wanted_tags),
+                    )
+                ],
+            ]
+        elif menu == "paths":
+            paths = self.get_root_folders() or []
+            keyboard_menu_row = [
+                (
+                    [
+                        InlineKeyboardButton(
+                            f"Add {p}",
+                            callback_data=construct_command(
+                                "add", index, p, wanted_tags
+                            ),
+                        )
+                    ]
+                    for p in paths
+                )
+            ]
+        elif not menu:
+            if not movie["id"]:
+                keyboard_act_row_0 += [
+                    InlineKeyboardButton(
+                        f"Add {p}",
+                        callback_data=construct_command("add", index, p, wanted_tags),
+                    )
                 ]
-            elif menu == 'paths':
-                paths = self.get_root_folders() or []
-                keyboardMenuRow = [
-                    ([InlineKeyboardButton(
-                        f"Add {p}", callback_data="add")] for p in paths)
+                keyboard_act_row_1 += [
+                    (
+                        InlineKeyboardButton(
+                            "Add to Path",
+                            callback_data=construct_command("path", index),
+                        )
+                        if self.allow_path_selection
+                        else None
+                    ),
+                    (
+                        InlineKeyboardButton(
+                            "Add with Tags",
+                            callback_data=construct_command("tags", index),
+                        )
+                        if self.allow_tag_selection
+                        else None
+                    ),
                 ]
-
-        keyboardActRow = []
-        if not menu:
-            if not movie['id']:
-                keyboardActRow += [InlineKeyboardButton("Add", "add")]
             else:
-                keyboardActRow += [InlineKeyboardButton(
-                    "Added", callback_data="noop"), ]
+                keyboard_act_row_0 += [
+                    InlineKeyboardButton(
+                        "Remove", callback_data=construct_command("remove", index)
+                    ),
+                ]
+                keyboard_act_row_1 += [
+                    (
+                        InlineKeyboardButton(
+                            "Change Path",
+                            callback_data=construct_command("path", index),
+                        )
+                        if self.allow_path_selection
+                        else None
+                    ),
+                    (
+                        InlineKeyboardButton(
+                            "Change Tags",
+                            callback_data=construct_command("tags", index),
+                        )
+                        if self.allow_tag_selection
+                        else None
+                    ),
+                ]
 
-        keyboardActRow += [InlineKeyboardButton(
-            "Cancel", callback_data="cancel",), ]
+        keyboard_act_row_2 = [
+            InlineKeyboardButton(
+                "Cancel",
+                callback_data="cancel",
+            ),
+        ]
 
-        reply_markup = InlineKeyboardMarkup([
-            keyboardNavRow,
-            keyboardMenuRow,
-            keyboardActRow,
-        ])
+        keyboard_markup = InlineKeyboardMarkup(
+            [
+                keyboard_nav_row,
+                keyboard_menu_row,
+                keyboard_act_row_0,
+                keyboard_act_row_1,
+                keyboard_act_row_2,
+            ]
+        )
+
         reply_message = f"{movie['title']} "
-        if movie['year'] and movie['year'] not in movie['title']:
+        if movie["year"] and movie["year"] not in movie["title"]:
             reply_message += f"({movie['year']}) "
 
-        if movie['runtime']:
+        if movie["runtime"]:
             reply_message += f"{movie['runtime']}min "
 
         reply_message += f"- {movie['status'].title()}\n\n{movie['overview']}"
@@ -219,7 +270,7 @@ class Radarr(ArrService):
                 chat_id=update.message.chat.id,
                 photo=movie["remotePoster"],
                 caption=reply_message,
-                reply_markup=reply_markup,
+                reply_markup=keyboard_markup,
             )
         except BadRequest as e:
             if str(e) in bad_request_poster_error_messages:
@@ -230,36 +281,99 @@ class Radarr(ArrService):
                     chat_id=update.message.chat.id,
                     photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
                     caption=reply_message,
-                    reply_markup=reply_markup,
+                    reply_markup=keyboard_markup,
                 )
             else:
                 raise
 
-    @ command()
-    @ authorized(min_auth_level=1)
+    @command()
+    @authorized(min_auth_level=1)
     def cmd_default(self, update, context):
         title = update.message.text
+        chat_id = update.message.chat.id
+
+        # Search movies and store the results in the session db
         movies = self.search(title) or []
-        self.reply(update, context, movies[0], 0, len(movies))
+        self.session_db.add_session_entry(chat_id, movies, key="movies")
 
-    @ subCommand(cmd='add')
-    @ authorized(min_auth_level=1)
+        self.reply(update, context, movies, 0)
+
+    @subCommand(cmd="goto")
+    @authorized(min_auth_level=1)
+    def cmd_goto(self, update, context, args):
+        movie_id = args[0]
+        chat_id = update.message.chat.id
+
+        # Retrieve movies from the session db
+        movies = self.session_db.get_session_entry(chat_id, key="movies")
+
+        self.reply(update, context, movies, movie_id)
+
+    @subCommand(cmd="tags")
+    @authorized(min_auth_level=1)
+    def cmd_goto(self, update, context, args):
+        movie_id = args[0]
+        chat_id = update.message.chat.id
+
+        # Retrieve movies from the session db
+        movies = self.session_db.get_session_entry(chat_id, key="movies")
+
+        self.reply(
+            update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
+        )
+
+    @subCommand(cmd="path")
+    @authorized(min_auth_level=1)
+    def cmd_goto(self, update, context, args):
+        movie_id = args[0]
+        chat_id = update.message.chat.id
+
+        # Retrieve movies from the session db
+        movies = self.session_db.get_session_entry(chat_id, key="movies")
+
+        self.reply(
+            update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
+        )
+
+    @subCommand(cmd="add")
+    @authorized(min_auth_level=1)
     def cmd_add(self, update, context):
-        pass
+        movie_id = args[0]
 
-    @ subCommand(cmd='cancel')
-    @ authorized(min_auth_level=1)
+        chat_id = update.message.chat.id
+
+        # Retrieve movies from the session db
+        movies = self.session_db.get_session_entry(chat_id, key="movies")
+
+        # Add the movie
+        self.add(movie=movies[movie_id], quality_profile=args[1], tags=args[2:])
+
+        # Clear session db & remove context
+        del context
+        del movies
+        self.session_db.clear_session(chat_id)
+
+        update.query.message.reply_text("Movie added!")
+
+    @subCommand(cmd="remove")
+    @authorized(min_auth_level=1)
+    def cmd_remove(self, update, context):
+        del context
+        chat_id = update.message.chat.id
+
+        # Clear session db
+        self.session_db.clear_session(chat_id)
+
+        update.query.message.reply_text("Movie removed!")
+
+    @subCommand(cmd="cancel")
+    @authorized(min_auth_level=1)
     def cmd_cancel(self, update, context):
         del context
+        chat_id = update.message.chat.id
+
+        # Clear session db
+        self.session_db.clear_session(chat_id)
+
         update.query.message.reply_text("Search canceled")
         update.query.message.delete()
-
-    @ subCommand(cmd='next')
-    @ authorized(min_auth_level=1)
-    def cmd_next(self, update, context):
-        pass
-
-    @ subCommand(cmd='prev')
-    @ authorized(min_auth_level=1)
-    def cmd_prev(self, update, context):
-        pass
