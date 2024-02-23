@@ -3,6 +3,7 @@ from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
 from . import ArrService, Action, ArrVariants, find_first
+from .ext import ExtArrService
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
@@ -32,7 +33,7 @@ class State:
 
 
 @handler
-class Sonarr(ArrService):
+class Sonarr(ExtArrService, ArrService):
     def __init__(
         self,
         commands: List[str],
@@ -207,7 +208,7 @@ class Sonarr(ArrService):
         reply_message = reply_message[0:1024]
 
         return Response(
-            photo=item["remotePoster"] if full_redraw else None,
+            photo=item.get("remotePoster") if full_redraw else None,
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
@@ -241,6 +242,12 @@ class Sonarr(ArrService):
         )
 
         return self.create_message(state, full_redraw=True)
+
+    @repaint
+    @command(cmds=["queue"])
+    @authorized(min_auth_level=1)
+    async def cmd_queue(self, update, context, args):
+        return await ExtArrService.cmd_queue(self, update, context, args)
 
     @repaint
     @callback(

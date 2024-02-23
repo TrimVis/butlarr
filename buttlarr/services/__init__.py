@@ -84,6 +84,44 @@ class ArrService(TelegramHandler):
         assert api_version, "Could not find compatible api."
         return api_version
 
+    def get_queue_item(self, id: int):
+        return self.request(
+            f"queue/{id}",
+            params=params,
+            fallback=[],
+        )
+
+    def get_queue(self, page: int = None, page_size: int = None):
+        params = {}
+        if page:
+            params["page"] = page
+        if page_size:
+            params["page_size"] = page_size
+        return self.request(
+            "queue",
+            params=params,
+            fallback=[],
+        )
+
+    def get_queue_details(self, movie_id: int = None, include_movie: bool = None):
+        params = {}
+        if movie_id:
+            params["movieId"] = movie_id
+        if include_movie != None:
+            params["includeMovie"] = include_movie
+        return self.request(
+            "queue",
+            params=params,
+            fallback=[],
+        )
+
+    def get_queue_detail(self, id: int):
+        return self.request(
+            f"queue/details/{id}",
+            params={},
+            fallback=[],
+        )
+
     def lookup(self, term: str = None):
         if not self.arr_variant:
             return NotImplementedError(

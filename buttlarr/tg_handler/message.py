@@ -48,12 +48,19 @@ def repaint(func):
     async def wrapped_func(self, update, context, *args, **kwargs):
         message = await func(self, update, context, *args, **kwargs)
 
-        if not message.photo and update.callback_query:
-            await update.callback_query.answer()
-            await update.callback_query.edit_message_caption(
-                reply_markup=message.reply_markup,
-                caption=message.caption,
-            )
+        if not message.photo:
+            if update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.edit_message_caption(
+                    reply_markup=message.reply_markup,
+                    caption=message.caption,
+                )
+            else:
+                await update.message.reply_text(
+                    message.caption,
+                    reply_markup=message.reply_markup,
+                    parse_mode="Markdown",
+                )
         else:
             try:
                 await context.bot.send_photo(

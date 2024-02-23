@@ -3,6 +3,7 @@ from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
 from . import ArrService, Action, ArrVariants, find_first
+from .ext import ExtArrService, QueueState
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
@@ -32,7 +33,7 @@ class State:
 
 
 @handler
-class Radarr(ArrService):
+class Radarr(ExtArrService, ArrService):
     def __init__(
         self,
         commands: List[str],
@@ -206,7 +207,7 @@ class Radarr(ArrService):
         reply_message = reply_message[0:1024]
 
         return Response(
-            photo=item["remotePoster"] if full_redraw else None,
+            photo=item.get("remotePoster") if full_redraw else None,
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
@@ -241,32 +242,11 @@ class Radarr(ArrService):
 
         return self.create_message(state, full_redraw=True)
 
-    # @repaint
-    # @command(cmds=["dl-queue"])
-    # @authorized(min_auth_level=1)
-    # async def cmd_queue(self, update, context, args):
-    #     title = " ".join(args)
-    #     items = self.lookup(title)
-    #     state = State(
-    #         items=items,
-    #         index=0,
-    #         root_folder=find_first(
-    #             self.root_folders,
-    #             lambda x: items[0].get("folderName").startswith(x.get("path")),
-    #         ),
-    #         quality_profile=find_first(
-    #             self.quality_profiles,
-    #             lambda x: items[0].get("qualityProfileId") == x.get("id"),
-    #         ),
-    #         tags=items[0].get("tags", []),
-    #         menu=None,
-    #     )
-
-    #     self.session_db.add_session_entry(
-    #         default_session_state_key_fn(self, update), state
-    #     )
-
-    #     return self.create_message(state, full_redraw=True)
+    @repaint
+    @command(cmds=["queue"])
+    @authorized(min_auth_level=1)
+    async def cmd_queue(self, update, context, args):
+        return await ExtArrService.cmd_queue(self, update, context, args)
 
     @repaint
     @callback(

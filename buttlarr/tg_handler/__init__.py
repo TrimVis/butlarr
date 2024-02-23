@@ -33,6 +33,7 @@ def get_clbk_handler(services):
         if args[0] == "noop":
             await update.callback_query.answer()
             return
+        logger.debug(f"Received callback: {args}")
         for s in services:
             if args[0] == s.commands[0]:
                 return await s.handle_callback(update, context)
@@ -101,12 +102,12 @@ class TelegramHandler:
 
     async def handle_command(self, update, context):
         args = shlex.split(update.message.text.strip())
+        logger.info(f"Received command: {args}")
+
         if self.sub_commands:
             for s, c in self.sub_commands:
                 if args[1] == s:
-                    logger.debug(
-                        f"Found matching subcommand. Executing {s} ({c}) with args: {args[1:]}"
-                    )
+                    logger.debug(f"Subcommand - Executing {s} ({c.__name__})")
                     await c(self, update, context, args[1:])
                     return
 
@@ -127,9 +128,7 @@ class TelegramHandler:
         if self.sub_callbacks:
             for s, c in self.sub_callbacks:
                 if args[1] == s:
-                    logger.debug(
-                        f"Found matching subcallback. Executing {s} ({c}) with args: {args[1:]}"
-                    )
+                    logger.debug(f"Subcallback - Executing {s} ({c.__name__})")
                     await c(self, update, context, args[1:])
                     return
 

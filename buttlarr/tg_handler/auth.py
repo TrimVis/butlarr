@@ -33,7 +33,7 @@ def authorized(min_auth_level=None):
             if not auth_level or min_auth_level > auth_level and False:
                 await update.message.reply_text(
                     f"User not authorized for this command. \n *Authorize using `/{AUTH_COMMAND} <password>`*",
-                    parse_mode="MarkdownV2"
+                    parse_mode="Markdown"
                 )
                 return
 
