@@ -324,10 +324,11 @@ class Radarr(ArrService):
         )
 
     @repaint
-    @command()
+    @command(default=True)
     @authorized(min_auth_level=1)
     async def cmd_default(self, update, context, args):
-        title = " ".join(args[1:])
+        title = " ".join(args)
+        print(title)
 
         movies = self.search(title) or []
         root_folder = self.get_root_folders()[0]
@@ -339,109 +340,61 @@ class Radarr(ArrService):
         return self.create_message(state, full_redraw=True)
 
     @repaint
-    @callback(cmd="goto")
+    @callback(cmds=["goto", "tags", "addtag"])
     @sessionState()
     @authorized(min_auth_level=1)
-    async def btn_goto(self, update, context, args, state):
-        return self.create_message(
-            (
-                replace(state, index=int(args[0]), menu=None)
-                if args
-                else replace(state, menu=None)
-            ),
-            full_redraw=(len(args)),
-        )
-
-    @repaint
-    @callback(cmd="tags")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_tags_list(self, update, context, args, state):
-        return self.create_message(replace(state, tags=[], menu="tags"))
-
-    @repaint
-    @callback(cmd="addtag")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_tags_add(self, update, context, args, state):
-        return self.create_message(replace(state, tags=[*state.tags, args[0]]))
-
-    @repaint
-    @callback(cmd="remtag")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_tags_rem(self, update, context, args, state):
-        return self.create_message(
-            replace(state, tags=[t for t in state.tags if t != args[0]])
-        )
-
-    @repaint
-    @callback(cmd="path")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_path_list(self, update, context, args, state):
-        return self.create_message(replace(state, menu="path"))
-
-    @repaint
-    @callback(cmd="selectpath")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_path_select(self, update, context, args, state):
-        path = self.get_root_folder(args[0])
-        return self.create_message(replace(state, root_folder=path, menu="add"))
-
-    @repaint
-    @callback(cmd="quality")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_quality_list(self, update, context, args, state):
-        return self.create_message(replace(state, menu="quality"))
-
-    @repaint
-    @callback(cmd="selectquality")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_quality_select(self, update, context, args, state):
-        quality_profile = self.get_quality_profile(args[0])
-        return self.create_message(
-            replace(state, quality_profile=quality_profile, menu="add")
-        )
-
-    @repaint
-    @callback(cmd="addmenu")
-    @sessionState()
-    @authorized(min_auth_level=1)
-    async def btn_add_menu(self, update, context, args, state):
-        return self.create_message(replace(state, menu="add"))
+    async def clbk_update(self, update, context, args, state):
+        if args[0] == "goto":
+            return self.create_message(
+                (
+                    replace(state, index=int(args[1]), menu=None)
+                    if len(args) > 1
+                    else replace(state, menu=None)
+                ),
+                full_redraw=(len(args)),
+            )
+        elif args[0] == "tags":
+            return self.create_message(replace(state, tags=[], menu="tags"))
+        elif args[0] == "addtag":
+            return self.create_message(replace(state, tags=[*state.tags, args[1]]))
+        elif args[0] == "remtag":
+            return self.create_message(
+                replace(state, tags=[t for t in state.tags if t != args[1]])
+            )
+        elif args[0] == "path":
+            return self.create_message(replace(state, menu="path"))
+        elif args[0] == "selectpath":
+            path = self.get_root_folder(args[1])
+            return self.create_message(replace(state, root_folder=path, menu="add"))
+        elif args[0] == "quality":
+            return self.create_message(replace(state, menu="quality"))
+        elif args[0] == "selectquality":
+            quality_profile = self.get_quality_profile(args[1])
+            return self.create_message(
+                replace(state, quality_profile=quality_profile, menu="add")
+            )
+        elif args[0] == "addmenu":
+            return self.create_message(replace(state, menu="add"))
 
     @clear
-    @callback(cmd="add")
+    @callback(cmds=["add", "remove", "cancel"])
     @sessionState(clear=True)
     @authorized(min_auth_level=1)
     async def btn_add(self, update, context, args, state):
-        # Add the movie
-        self.add(
-            movie=state.movies[state.index],
-            quality_profile=state.quality_profile.get("id", 0),
-            tags=state.tags,
-            root_folder=state.root_folder.get("path", ""),
-        )
+        if args[0] == "add":
+            # Add the movie
+            self.add(
+                movie=state.movies[state.index],
+                quality_profile=state.quality_profile.get("id", 0),
+                tags=state.tags,
+                root_folder=state.root_folder.get("path", ""),
+            )
 
-        # Clear session db
-        del context
+            # Clear session db
+            del context
 
-        return "Movie added!"
-
-    @clear
-    @callback(cmd="remove")
-    @sessionState(clear=True)
-    @authorized(min_auth_level=1)
-    async def btn_remove(self, update, context, args, state):
-        return "Movie removed!"
-
-    @clear
-    @callback(cmd="cancel")
-    @sessionState(clear=True)
-    @authorized(min_auth_level=1)
-    async def btn_cancel(self, update, context, args, state):
-        return "Search canceled!"
+            return "Movie added!"
+        elif args[0] == "remove":
+            return "Movie removed!"
+        elif args[0] == "cancel":
+            return "Search canceled!"

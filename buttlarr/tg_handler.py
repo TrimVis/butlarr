@@ -10,23 +10,23 @@ from .config.secrets import AUTH_PASSWORD
 from .database import Database
 
 
-def callback(cmd=None):
+def callback(cmds=[], default=False):
     def decorator(func):
-        if not cmd:
-            func.main_clbk = True
-        else:
-            func.sub_clbk = cmd
+        if default:
+            func.clbk_default = True
+        if cmds:
+            func.clbk_cmds = cmds
         return func
 
     return decorator
 
 
-def command(cmd=None):
+def command(cmds=[], default=False):
     def decorator(func):
-        if not cmd:
-            func.main_cmd = True
-        else:
-            func.sub_cmd = cmd
+        if default:
+            func.cmd_default = True
+        if cmds:
+            func.cmd_cmds = cmds
         return func
 
     return decorator
@@ -38,14 +38,14 @@ def handler(cls):
     default_command = None
     default_callback = None
     for method in cls.__dict__.values():
-        if hasattr(method, "sub_cmd"):
-            cls.sub_commands.append((method.sub_cmd, method))
-        if hasattr(method, "main_cmd"):
+        if hasattr(method, "cmd_cmds"):
+            cls.sub_commands += [(cmd, method) for cmd in method.cmd_cmds]
+        if hasattr(method, "cmd_default"):
             assert default_command is None, "Only one default command allowed."
             default_command = method
-        if hasattr(method, "sub_clbk"):
-            cls.sub_callbacks.append((method.sub_clbk, method))
-        if hasattr(method, "main_clbk"):
+        if hasattr(method, "clbk_cmds"):
+            cls.sub_callbacks += [(cmd, method) for cmd in method.clbk_cmds]
+        if hasattr(method, "clbk_default"):
             assert default_callback is None, "Only one default callback allowed."
             default_callback = method
     cls.default_command = default_command
@@ -82,7 +82,7 @@ class TelegramHandler:
 
         logger.debug("No matching subcommand registered. Trying fallback")
         try:
-            await self.default_command(update, context, args)
+            await self.default_command(update, context, args[1:])
         except NotImplementedError:
             logger.error("No default command handler registered.")
 
@@ -98,7 +98,7 @@ class TelegramHandler:
                     logger.debug(
                         f"Found matching subcallback. Executing {s} ({c}) with args: {args[1:]}"
                     )
-                    await c(self, update, context, args[1:])
+                    await c(self, update, context, args)
                     return
 
         logger.debug("No matching subcallback registered. Trying fallback")
