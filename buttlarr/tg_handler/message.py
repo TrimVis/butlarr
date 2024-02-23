@@ -23,10 +23,10 @@ bad_request_poster_error_messages = [
 
 @dataclass(frozen=True)
 class Response:
-    photo: Optional[str]
-    caption: str
-    reply_markup: Optional[Any]
-    state: Optional[Any]
+    photo: Optional[str] = None
+    caption: str = ""
+    reply_markup: Optional[Any] = None
+    state: Optional[Any] = None
 
 
 def clear(func):
@@ -35,7 +35,7 @@ def clear(func):
         message = await func(self, update, context, *args, **kwargs)
 
         if update.callback_query:
-            await update.callback_query.message.reply_text(message)
+            await update.callback_query.message.reply_text(message.caption)
             await update.callback_query.message.delete()
         else:
             await update.message.delete()

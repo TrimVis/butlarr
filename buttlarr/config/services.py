@@ -16,7 +16,7 @@ SERVICES = [
     ),
     Sonarr(
         commands=["anime"],
-        api_host=API_HOSTS[1],
-        api_key=API_KEYS[1],
+        api_host=API_HOSTS[2],
+        api_key=API_KEYS[2],
     )
 ]

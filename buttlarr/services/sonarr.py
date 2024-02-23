@@ -71,12 +71,12 @@ class Sonarr(ArrService):
                         self.get_clbk("path", state.index),
                     )
                 ],
-                [
-                    Button(
-                        f"Change Tags   (Total: {len(state.tags)})",
-                        self.get_clbk("tags", state.index),
-                    ),
-                ],
+                #      [
+                #          Button(
+                #              f"Change Tags   (Total: {len(state.tags)})",
+                #              self.get_clbk("tags", state.index),
+                #          ),
+                #      ],
             ]
 
         elif state.menu == "tags":
@@ -170,9 +170,9 @@ class Sonarr(ArrService):
                     ]
                 )
         else:
-            if state.menu != "add":
+            if not state.menu:
                 rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
-            else:
+            elif state.menu == "add":
                 rows_action.append([Button(f"✅ Submit", self.get_clbk("add"))])
 
         if state.menu:
@@ -232,6 +232,7 @@ class Sonarr(ArrService):
             "path",
             "selectpath",
             "quality",
+            "selectquality",
             "addmenu",
         ]
     )
