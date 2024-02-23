@@ -6,6 +6,17 @@ from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
 
 
+def find_first(elems, check, fallback=0):
+    try:
+        result = next(e for e in elems if check(e))
+    except:
+        result = None
+    finally:
+        if not result:
+            return elems[fallback]
+        return result
+
+
 class Action(Enum):
     GET = "get"
     POST = "post"

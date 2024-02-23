@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, Action, ArrVariants
+from . import ArrService, Action, ArrVariants, find_first
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
@@ -209,11 +209,22 @@ class Radarr(ArrService):
     @authorized(min_auth_level=1)
     async def cmd_default(self, update, context, args):
         title = " ".join(args)
-
         items = self.lookup(title)
-        root_folder = self.get_root_folders()[0]
-        quality_profile = self.get_quality_profiles()[0]
-        state = State(items, 0, quality_profile, [], root_folder, None)
+
+        state = State(
+            items=items,
+            index=0,
+            root_folder=find_first(
+                self.root_folders,
+                lambda x: items[0].get("folderName").startswith(x.get("path")),
+            ),
+            quality_profile=find_first(
+                self.quality_profiles,
+                lambda x: items[0].get("qualityProfileId") == x.get("id"),
+            ),
+            tags=items[0].get("tags", []),
+            menu=None,
+        )
 
         self.session_db.add_session_entry(
             default_session_state_key_fn(self, update), state
@@ -241,7 +252,22 @@ class Radarr(ArrService):
         full_redraw = False
         if args[0] == "goto":
             if len(args) > 1:
-                state = replace(state, index=int(args[1]), menu=None)
+                idx = int(args[1])
+                item = state.items[idx]
+                state = replace(
+                    state,
+                    index=idx,
+                    root_folder=find_first(
+                        self.root_folders,
+                        lambda x: item.get("folderName").startswith(x.get("path")),
+                    ),
+                    quality_profile=find_first(
+                        self.quality_profiles,
+                        lambda x: item.get("qualityProfileId") == x.get("id"),
+                    ),
+                    tags=item.get("tags", []),
+                    menu=None,
+                )
                 full_redraw = True
             else:
                 state = replace(state, menu=None)
@@ -277,8 +303,8 @@ class Radarr(ArrService):
         if args[0] == "add":
             self.add(
                 item=state.items[state.index],
-                quality_profile_id=state.quality_profile.get("id", 0),
-                root_folder_path=state.root_folder.get("path", ""),
+                quality_profile_id=state.quality_profile.get("id"),
+                root_folder_path=state.root_folder.get("path"),
                 tags=state.tags,
             )
 
