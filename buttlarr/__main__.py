@@ -5,6 +5,7 @@ from telegram.ext import Application
 from .database import Database
 from .config.secrets import TELEGRAM_TOKEN
 from .config.services import SERVICES 
+from .tg_handler import get_clbk_handler
 from .tg_handler.auth import get_auth_handler
 
 
@@ -28,6 +29,9 @@ def main():
     logger.info('Registering services..')
     for s in SERVICES:
         s.register(application, db)
+
+    logger.info('Registering callback handler...')
+    application.add_handler(get_clbk_handler(SERVICES))
 
     logger.info('Start polling for messages..')
     application.run_polling(allowed_updates=Update.ALL_TYPES)

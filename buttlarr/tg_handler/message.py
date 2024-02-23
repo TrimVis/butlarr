@@ -69,7 +69,7 @@ def repaint(func):
             except BadRequest as e:
                 if str(e) in bad_request_poster_error_messages:
                     logger.error(
-                        f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
+                        f"Error sending photo [{message.photo}]: BadRequest: {e}. Attempting to send with default poster..."
                     )
                     await context.bot.send_photo(
                         chat_id=(

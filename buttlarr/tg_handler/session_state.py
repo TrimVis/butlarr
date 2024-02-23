@@ -15,10 +15,14 @@ from ..config.secrets import AUTH_PASSWORD
 from ..session_database import SessionDatabase
 
 
-def default_session_state_key_fn(update):
+def get_chat_id(update):
     if update.callback_query:
         return update.callback_query.message.chat_id
     return update.message.chat_id
+
+
+def default_session_state_key_fn(sid: str, update):
+    return str(sid) + str(get_chat_id(update))
 
 
 def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
@@ -26,23 +30,19 @@ def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
 
         @wraps(func)
         async def wrapped_func(self, update, context, *args, **kwargs):
-
             # init calls do not need a state, as they will create it first
             if init:
-                self.session_db = SessionDatabase()
                 return await func(self, update, context, *args, **kwargs)
-            elif not self.session_db:
-                self.session_db = SessionDatabase()
 
             # get state
-            chat_id = default_session_state_key_fn(update)
-            state = self.session_db.get_session_entry(chat_id)
+            key = key_fn(self.id, update)
+            state = self.session_db.get_session_entry(key)
             result = await func(self, update, context, *args, **kwargs, state=state)
 
             if clear:
-                self.session_db.clear_session(chat_id)
+                self.session_db.clear_session(key)
             else:
-                self.session_db.add_session_entry(chat_id, result.state)
+                self.session_db.add_session_entry(key, result.state)
             return result
 
         return wrapped_func

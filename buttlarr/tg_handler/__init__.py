@@ -10,8 +10,15 @@ from ..config.secrets import AUTH_PASSWORD
 from ..database import Database
 
 
-def construct_command(*args: List[str]):
-    return (" ").join([f'"{arg}"' for arg in args])
+def get_clbk_handler(services):
+    async def handler(update, context):
+        args = shlex.split(update.callback_query.data.strip())
+        for s in services:
+            if args[0] == s.commands[0]:
+                return await s.handle_callback(update, context)
+        logger.error("Found no matching callback handler!")
+
+    return CallbackQueryHandler(handler)
 
 
 def callback(cmds=[], default=False):
@@ -67,7 +74,6 @@ class TelegramHandler:
         self.db = db
         for cmd in self.commands:
             application.add_handler(CommandHandler(cmd, self.handle_command))
-        application.add_handler(CallbackQueryHandler(self.handle_callback))
 
     async def default_command(self, _update, _context, _args=None):
         del _update, _context, _args
@@ -96,17 +102,23 @@ class TelegramHandler:
 
     async def handle_callback(self, update, context):
         args = shlex.split(update.callback_query.data.strip())
+        if args[0] != self.commands[0]:
+            return
         if self.sub_callbacks:
             for s, c in self.sub_callbacks:
-                if args[0] == s:
+                if args[1] == s:
                     logger.debug(
                         f"Found matching subcallback. Executing {s} ({c}) with args: {args[1:]}"
                     )
-                    await c(self, update, context, args)
+                    await c(self, update, context, args[1:])
                     return
 
         logger.debug("No matching subcallback registered. Trying fallback")
         try:
-            await self.default_callback(update, context, args)
+            await self.default_callback(update, context, args[1:])
         except NotImplementedError:
             logger.error("No default callback handler registered.")
+
+    def get_clbk(self, *args: List[str]):
+        args = [self.commands[0], *args]
+        return (" ").join([f'"{arg}"' for arg in args])

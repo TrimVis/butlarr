@@ -35,13 +35,13 @@ class State:
 
 
 @handler
-class Radarr(ArrService):
+class Sonarr(ArrService):
     def __init__(
         self,
         commands: List[str],
         api_host: str,
         api_key: str,
-        id="Radarr",
+        id="Sonarr",
     ):
 
         self.id = id
@@ -49,7 +49,7 @@ class Radarr(ArrService):
         self.api_key = api_key
 
         self.api_version = self.detect_api(api_host)
-        self.arr_variant = ArrVariants.RADARR
+        self.arr_variant = ArrVariants.SONARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
 
@@ -61,9 +61,9 @@ class Radarr(ArrService):
         rows_menu = []
         if state.menu == "add":
             if in_library:
-                row_navigation = [Button("=== Editing Movie ===", "noop")]
+                row_navigation = [Button("=== Editing Series ===", "noop")]
             else:
-                row_navigation = [Button("=== Adding Movie ===", "noop")]
+                row_navigation = [Button("=== Adding Series ===", "noop")]
             rows_menu = [
                 [
                     Button(
@@ -139,6 +139,7 @@ class Radarr(ArrService):
                     else Button()
                 ),
                 (
+                    # TODO pjordan: Find replacement
                     Button(
                         "TMDB",
                         url=f"https://www.themoviedb.org/movie/{item['tmdbId']}",
@@ -285,8 +286,8 @@ class Radarr(ArrService):
                 tags=state.tags,
             )
 
-            return Response(caption="Movie added!")
+            return Response(caption="Series added!")
         elif args[0] == "remove":
-            return Response(caption="Movie removed!")
+            return Response(caption="Series removed!")
         elif args[0] == "cancel":
             return Response(caption="Search canceled!")
