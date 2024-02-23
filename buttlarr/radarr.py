@@ -3,7 +3,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 from .session_database import SessionDatabase
 from .common import ArrService, Action
@@ -25,8 +25,10 @@ class State:
     index: int
     quality_profile: str
     tags: List[str]
-    path: str
-    menu: Optional[Literal["path"] | Literal["tags"] | Literal["quality_profile"]]
+    root_folder: str
+    menu: Optional[
+        Literal["path"] | Literal["tags"] | Literal["quality_profile"] | Literal["add"]
+    ]
 
 
 @handler
@@ -131,51 +133,53 @@ class Radarr(ArrService):
         index = state.index
         menu = state.menu
         wanted_tags = state.tags
+        in_library = "id" in movie and movie["id"]
 
-        keyboard_nav_row = [
-            (
-                InlineKeyboardButton(
-                    "⬅",
-                    callback_data=construct_command("goto", index - 1),
-                )
-                if index > 0
-                else None
-            ),
-            (
-                InlineKeyboardButton(
-                    "TMDB", url=f"https://www.themoviedb.org/movie/{movie['tmdbId']}"
-                )
-                if movie["tmdbId"]
-                else None
-            ),
-            (
-                InlineKeyboardButton(
-                    "IMDB", url=f"https://imdb.com/title/{movie['imdbId']}"
-                )
-                if movie["imdbId"]
-                else None
-            ),
-            (
-                InlineKeyboardButton(
-                    "➡",
-                    callback_data=construct_command("goto", index + 1),
-                )
-                if index < len(movies) - 1
-                else None
-            ),
-        ]
+        empty_key = InlineKeyboardButton(
+            "",
+            callback_data="noop",
+        )
 
-        keyboard_menu_row = None
-        keyboard_act_row_0 = []
-        keyboard_act_row_1 = []
-        if menu == "tags":
+        rows_menu = []
+        if menu == "add":
+            rows_menu = [
+                [
+                    InlineKeyboardButton(
+                        f"{'Change' if in_library else 'Select'} Quality   ({state.quality_profile.get('name', '-')})",
+                        callback_data=construct_command("path", index),
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'Change' if in_library else 'Select'} Path   ({state.root_folder.get('path', '-')})",
+                        callback_data=construct_command("path", index),
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        f"{'Change' if in_library else 'Select'} Tags   (Total: {len(state.tags)})",
+                        callback_data=construct_command("tags", index),
+                    ),
+                ],
+            ]
+            row_navigation = [
+                InlineKeyboardButton(
+                    (
+                        "=== Adding Movie ==="
+                        if not in_library
+                        else "=== Editing Movie ==="
+                    ),
+                    callback_data="noop",
+                )
+            ]
+        elif menu == "tags":
             tags = self.get_all_tags() or []
-            keyboard_menu_row = [
+            rows_menu = [
                 (
                     [
                         InlineKeyboardButton(
                             f"Tag {tag}" if tag not in wanted_tags else f"Remove {tag}",
-                            callback_data=construct_command("tag", *wanted_tags, i),
+                            callback_data=construct_command("addtag", i),
                         )
                     ]
                     for (i, tag) in enumerate(tags)
@@ -183,95 +187,105 @@ class Radarr(ArrService):
                 [
                     InlineKeyboardButton(
                         "Done",
-                        callback_data=construct_command("add", index, p, wanted_tags),
+                        callback_data=construct_command("addmenu"),
                     )
                 ],
             ]
-        elif menu == "paths":
-            paths = self.get_root_folders() or []
-            keyboard_menu_row = [
-                (
-                    [
-                        InlineKeyboardButton(
-                            f"Add {p}",
-                            callback_data=construct_command(
-                                "add", index, p, wanted_tags
-                            ),
-                        )
-                    ]
-                    for p in paths
-                )
+            row_navigation = [
+                InlineKeyboardButton("=== Selecting Tags ===", callback_data="noop")
             ]
-        elif not menu:
-            if not ("id" in movie and movie["id"]):
-                keyboard_act_row_0 += [
+        elif menu == "path":
+            paths = self.get_root_folders() or []
+            rows_menu = [
+                [
                     InlineKeyboardButton(
-                        f"Add",
-                        callback_data=construct_command("add", index, "", wanted_tags),
+                        f"{p}",
+                        callback_data=construct_command("selectpath", p),
                     )
                 ]
-                keyboard_act_row_1 += [
-                    (
-                        InlineKeyboardButton(
-                            "Add to Path",
-                            callback_data=construct_command("path", index),
-                        )
-                        if self.allow_path_selection
-                        else None
-                    ),
-                    (
-                        InlineKeyboardButton(
-                            "Add with Tags",
-                            callback_data=construct_command("tags", index),
-                        )
-                        if self.allow_tag_selection
-                        else None
-                    ),
-                ]
-            else:
-                keyboard_act_row_0 += [
+                for p in paths
+            ]
+            row_navigation = [
+                InlineKeyboardButton(
+                    "=== Selecting Root Folder ===", callback_data="noop"
+                )
+            ]
+        else:
+            row_navigation = [
+                (
                     InlineKeyboardButton(
-                        "Remove", callback_data=construct_command("remove", index)
-                    ),
-                ]
-                keyboard_act_row_1 += [
-                    (
-                        InlineKeyboardButton(
-                            "Change Path",
-                            callback_data=construct_command("path", index),
-                        )
-                        if self.allow_path_selection
-                        else None
-                    ),
-                    (
-                        InlineKeyboardButton(
-                            "Change Tags",
-                            callback_data=construct_command("tags", index),
-                        )
-                        if self.allow_tag_selection
-                        else None
-                    ),
-                ]
+                        "⬅ Prev",
+                        callback_data=construct_command("goto", index - 1),
+                    )
+                    if index > 0
+                    else empty_key
+                ),
+                (
+                    InlineKeyboardButton(
+                        "TMDB",
+                        url=f"https://www.themoviedb.org/movie/{movie['tmdbId']}",
+                    )
+                    if movie["tmdbId"]
+                    else None
+                ),
+                (
+                    InlineKeyboardButton(
+                        "IMDB", url=f"https://imdb.com/title/{movie['imdbId']}"
+                    )
+                    if movie["imdbId"]
+                    else None
+                ),
+                (
+                    InlineKeyboardButton(
+                        "Next ➡",
+                        callback_data=construct_command("goto", index + 1),
+                    )
+                    if index < len(movies) - 1
+                    else empty_key
+                ),
+            ]
 
-        keyboard_act_row_2 = [
-            InlineKeyboardButton(
-                "Cancel",
-                callback_data=construct_command("cancel", index),
+        rows_action = [
+            (
+                [
+                    InlineKeyboardButton(
+                        f"🗑 Remove", callback_data=construct_command("remove")
+                    ),
+                    (
+                        InlineKeyboardButton(
+                            f"Edit", callback_data=construct_command("addmenu")
+                        )
+                        if menu != "add"
+                        else InlineKeyboardButton(
+                            f"✅ Submit", callback_data=construct_command("add")
+                        )
+                    ),
+                ]
+                if in_library
+                else (
+                    [
+                        InlineKeyboardButton(
+                            f"➕ Add", callback_data=construct_command("addmenu")
+                        )
+                    ]
+                    if menu != "add"
+                    else [
+                        InlineKeyboardButton(
+                            f"✅ Submit", callback_data=construct_command("add")
+                        )
+                    ]
+                )
             ),
+            [
+                InlineKeyboardButton(
+                    "❌ Cancel",
+                    callback_data=construct_command("goto" if menu else "cancel"),
+                )
+            ],
         ]
 
-        keyboard = [
-            keyboard_nav_row,
-            keyboard_menu_row,
-            keyboard_act_row_0,
-            keyboard_act_row_1,
-            keyboard_act_row_2,
-        ]
-
-        # Ignore this ugly piece of code, we are just filtering out all Nones
+        keyboard = [row_navigation, *rows_menu, *rows_action]
         keyboard = [[k for k in ks if k] for ks in keyboard if ks]
-        keyboard = [[k for k in ks if k] for ks in keyboard if ks]
-
         keyboard_markup = InlineKeyboardMarkup(keyboard)
 
         reply_message = f"{movie['title']} "
@@ -288,6 +302,7 @@ class Radarr(ArrService):
             photo=movie["remotePoster"],
             caption=reply_message,
             reply_markup=keyboard_markup,
+            state=state,
         )
 
     @repaint
@@ -297,7 +312,9 @@ class Radarr(ArrService):
         title = " ".join(args[1:])
 
         movies = self.search(title) or []
-        state = State(movies, 0, "", [], "", None)
+        root_folder = self.get_root_folders()[0]
+        quality_profile = self.get_quality_profiles()[0]
+        state = State(movies, 0, quality_profile, [], root_folder, None)
 
         self.session_db.add_session_entry(default_session_state_key_fn(update), state)
 
@@ -308,20 +325,57 @@ class Radarr(ArrService):
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_goto(self, update, context, args, state):
-        return self.create_message(replace(state, index=int(args[0])))
+        return self.create_message(
+            replace(state, index=int(args[0])) if args else state
+        )
 
     @repaint
     @callback(cmd="tags")
     @sessionState()
     @authorized(min_auth_level=1)
-    async def btn_tags(self, update, context, args, state):
-        return self.create_message(state)
+    async def btn_tags_list(self, update, context, args, state):
+        print(state.movies[state.index])
+        return self.create_message(replace(state, tags=[], menu="tags"))
+
+    @repaint
+    @callback(cmd="addtag")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_tags_add(self, update, context, args, state):
+        print(state.movies[state.index])
+        return self.create_message(replace(state, tags=[*state.tags, args[0]]))
+
+    @repaint
+    @callback(cmd="remtag")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_tags_rem(self, update, context, args, state):
+        print(state.movies[state.index])
+        return self.create_message(
+            replace(state, tags=[t for t in state.tags if t != args[0]])
+        )
 
     @repaint
     @callback(cmd="path")
+    @sessionState()
     @authorized(min_auth_level=1)
-    async def btn_path(self, update, context, args, state):
-        return self.create_message(state)
+    async def btn_path_list(self, update, context, args, state):
+        root_folders = self.get_root_folders()
+        return self.create_message(state, root_folders=root_folders, menu="path")
+
+    @repaint
+    @callback(cmd="selectpath")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_path_select(self, update, context, args, state):
+        return self.create_message(replace(state, path=args[0], menu=None))
+
+    @repaint
+    @callback(cmd="addmenu")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_add_menu(self, update, context, args, state):
+        return self.create_message(replace(state, menu="add"))
 
     @clear
     @callback(cmd="add")
@@ -333,11 +387,11 @@ class Radarr(ArrService):
             movie=state.movies[state.index],
             quality_profile=state.quality_profile,
             tags=state.tags,
+            root_folder=state.root_folder,
         )
 
-        # Clear session db & remove context
+        # Clear session db
         del context
-        del movies
 
         return "Movie added!"
 

@@ -26,6 +26,7 @@ class Response:
     photo: str
     caption: str
     reply_markup: Any
+    state: Any
 
 
 def clear(func):
@@ -100,6 +101,8 @@ def sessionState(key_fn=default_session_state_key_fn, clear=False):
 
             if clear:
                 self.session_db.clear_session(chat_id)
+            else:
+                self.session_db.add_session_entry(chat_id, result.state)
             return result
 
         return wrapped_func
