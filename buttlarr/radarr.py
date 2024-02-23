@@ -290,7 +290,7 @@ class Radarr(ArrService):
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        await self.reply(update, context, movies, movie_id)
+        return self.create_message(movies, movie_id)
 
     @repaint
     @callback(cmd="tags")
@@ -302,9 +302,7 @@ class Radarr(ArrService):
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        await self.reply(
-            update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
-        )
+        return self.create_message(movies, movie_id)
 
     @repaint
     @callback(cmd="path")
@@ -316,9 +314,7 @@ class Radarr(ArrService):
         # Retrieve movies from the session db
         movies = self.session_db.get_session_entry(chat_id, key="movies")
 
-        await self.reply(
-            update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
-        )
+        return self.create_message(movies, movie_id)
 
     @clear
     @callback(cmd="add")
@@ -338,8 +334,7 @@ class Radarr(ArrService):
         del movies
         self.session_db.clear_session(chat_id)
 
-        await update.callback_query.message.reply_text("Movie added!")
-        await update.callback_query.message.delete()
+        return "Movie added!"
 
     @clear
     @callback(cmd="remove")
@@ -351,8 +346,7 @@ class Radarr(ArrService):
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        await update.callback_query.message.reply_text("Movie removed!")
-        await update.callback_query.message.delete()
+        return "Movie removed!"
 
     @clear
     @callback(cmd="cancel")
@@ -364,5 +358,4 @@ class Radarr(ArrService):
         # Clear session db
         self.session_db.clear_session(chat_id)
 
-        await update.callback_query.message.reply_text("Search canceled")
-        await update.callback_query.message.delete()
+        return "Search canceled!"
