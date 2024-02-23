@@ -5,7 +5,7 @@ from telegram.ext import Application
 from .database import Database
 from .config.secrets import TELEGRAM_TOKEN
 from .config.services import SERVICES 
-from .tg_handler_ext import get_auth_handler
+from .tg_handler.auth import get_auth_handler
 
 
 def init():

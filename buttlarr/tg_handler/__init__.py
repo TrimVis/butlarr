@@ -5,9 +5,13 @@ from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
 
-from .config.commands import AUTH_COMMAND
-from .config.secrets import AUTH_PASSWORD
-from .database import Database
+from ..config.commands import AUTH_COMMAND
+from ..config.secrets import AUTH_PASSWORD
+from ..database import Database
+
+
+def construct_command(*args: List[str]):
+    return (" ").join([f'"{arg}"' for arg in args])
 
 
 def callback(cmds=[], default=False):
