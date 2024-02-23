@@ -1,6 +1,6 @@
 import shlex
 
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
@@ -23,7 +23,7 @@ bad_request_poster_error_messages = [
 
 @dataclass(frozen=True)
 class Response:
-    photo: str
+    photo: Optional[str]
     caption: str
     reply_markup: Any
     state: Any
@@ -48,38 +48,45 @@ def repaint(func):
     async def wrapped_func(self, update, context, *args, **kwargs):
         message = await func(self, update, context, *args, **kwargs)
 
-        try:
-            await context.bot.send_photo(
-                chat_id=(
-                    update.message.chat.id
-                    if update.message
-                    else update.callback_query.message.chat.id
-                ),
-                photo=message.photo,
-                caption=message.caption,
+        if not message.photo and update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_caption(
                 reply_markup=message.reply_markup,
+                caption=message.caption,
             )
-        except BadRequest as e:
-            if str(e) in bad_request_poster_error_messages:
-                logger.error(
-                    f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
-                )
+        else:
+            try:
                 await context.bot.send_photo(
                     chat_id=(
                         update.message.chat.id
                         if update.message
                         else update.callback_query.message.chat.id
                     ),
-                    photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
+                    photo=message.photo,
                     caption=message.caption,
                     reply_markup=message.reply_markup,
                 )
-            else:
-                raise
-        finally:
-            if update.callback_query:
-                await update.callback_query.answer()
-                await update.callback_query.message.delete()
+            except BadRequest as e:
+                if str(e) in bad_request_poster_error_messages:
+                    logger.error(
+                        f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
+                    )
+                    await context.bot.send_photo(
+                        chat_id=(
+                            update.message.chat.id
+                            if update.message
+                            else update.callback_query.message.chat.id
+                        ),
+                        photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
+                        caption=message.caption,
+                        reply_markup=message.reply_markup,
+                    )
+                else:
+                    raise
+            finally:
+                if update.callback_query:
+                    await update.callback_query.answer()
+                    await update.callback_query.message.delete()
 
     return wrapped_func
 

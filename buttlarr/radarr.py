@@ -127,7 +127,7 @@ class Radarr(ArrService):
         return self.request("qualityprofile", fallback=[])
 
     # TODO pjordan: Add quality selection
-    def create_message(self, state: State):
+    def create_message(self, state: State, full_redraw=False):
         movie = state.movies[state.index]
         movies = state.movies
         index = state.index
@@ -299,7 +299,7 @@ class Radarr(ArrService):
         reply_message = reply_message[0:1024]
 
         return Response(
-            photo=movie["remotePoster"],
+            photo=movie["remotePoster"] if full_redraw else None,
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
@@ -318,7 +318,7 @@ class Radarr(ArrService):
 
         self.session_db.add_session_entry(default_session_state_key_fn(update), state)
 
-        return self.create_message(state)
+        return self.create_message(state, full_redraw=True)
 
     @repaint
     @callback(cmd="goto")
@@ -326,7 +326,12 @@ class Radarr(ArrService):
     @authorized(min_auth_level=1)
     async def btn_goto(self, update, context, args, state):
         return self.create_message(
-            replace(state, index=int(args[0])) if args else state
+            (
+                replace(state, index=int(args[0]), menu=None)
+                if args
+                else replace(state, menu=None)
+            ),
+            full_redraw=(len(args)),
         )
 
     @repaint
