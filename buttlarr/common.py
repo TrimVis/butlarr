@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Tuple, Optional, Any
 import requests
-from .telegram_handler import TelegramHandler
+from .tg_handler import TelegramHandler
 from .session_database import SessionDatabase
 
 

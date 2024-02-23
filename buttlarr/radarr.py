@@ -3,19 +3,11 @@ from loguru import logger
 from typing import Optional, List, Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
 
 from .session_database import SessionDatabase
 from .common import ArrService, Action
-from .telegram_handler import (
-    command,
-    authorized,
-    subCommand,
-    subCallback,
-    bad_request_poster_error_messages,
-    handler,
-    construct_command,
-)
+from .tg_handler import command, callback, handler
+from .tg_handler_ext import construct_command, Response, authorized, repaint, clear
 
 
 @handler
@@ -114,8 +106,7 @@ class Radarr(ArrService):
         return self.request("qualityprofile", fallback=[])
 
     # TODO pjordan: Add quality selection
-
-    async def reply(self, update, context, movies, index, menu=None, wanted_tags=[]):
+    def create_message(self, movies, index, menu=None, wanted_tags=[]):
         movie = movies[index]
 
         keyboard_nav_row = [
@@ -270,38 +261,13 @@ class Radarr(ArrService):
         reply_message += f"- {movie['status'].title()}\n\n{movie['overview']}"
         reply_message = reply_message[0:1024]
 
-        try:
-            await context.bot.send_photo(
-                chat_id=(
-                    update.message.chat.id
-                    if update.message
-                    else update.callback_query.message.chat.id
-                ),
-                photo=movie["remotePoster"],
-                caption=reply_message,
-                reply_markup=keyboard_markup,
-            )
-            if update.callback_query:
-                await update.callback_query.answer()
-                await update.callback_query.message.delete()
-        except BadRequest as e:
-            if str(e) in bad_request_poster_error_messages:
-                logger.error(
-                    f"Error sending photo [{movie['remotePoster']}]: BadRequest: {e}. Attempting to send with default poster..."
-                )
-                await context.bot.send_photo(
-                    chat_id=(
-                        update.message.chat.id
-                        if update.message
-                        else update.callback_query.message.chat.id
-                    ),
-                    photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
-                    caption=reply_message,
-                    reply_markup=keyboard_markup,
-                )
-            else:
-                raise
+        return Response(
+            photo=movie["remotePoster"],
+            caption=reply_message,
+            reply_markup=keyboard_markup,
+        )
 
+    @repaint
     @command()
     @authorized(min_auth_level=1)
     async def cmd_default(self, update, context, args):
@@ -312,11 +278,12 @@ class Radarr(ArrService):
         movies = self.search(title) or []
         self.session_db.add_session_entry(chat_id, movies, key="movies")
 
-        await self.reply(update, context, movies, 0)
+        return self.create_message(movies, 0)
 
-    @subCallback(cmd="goto")
+    @repaint
+    @callback(cmd="goto")
     @authorized(min_auth_level=1)
-    async def cmd_goto(self, update, context, args):
+    async def btn_goto(self, update, context, args):
         movie_id = int(args[0])
         chat_id = update.callback_query.message.chat.id
 
@@ -325,9 +292,10 @@ class Radarr(ArrService):
 
         await self.reply(update, context, movies, movie_id)
 
-    @subCallback(cmd="tags")
+    @repaint
+    @callback(cmd="tags")
     @authorized(min_auth_level=1)
-    async def cmd_tags(self, update, context, args):
+    async def btn_tags(self, update, context, args):
         movie_id = int(args[0])
         chat_id = update.callback_query.message.chat.id
 
@@ -338,9 +306,10 @@ class Radarr(ArrService):
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
-    @subCallback(cmd="path")
+    @repaint
+    @callback(cmd="path")
     @authorized(min_auth_level=1)
-    async def cmd_path(self, update, context, args):
+    async def btn_path(self, update, context, args):
         movie_id = int(args[0])
         chat_id = update.callback_query.message.chat.id
 
@@ -351,9 +320,10 @@ class Radarr(ArrService):
             update, context, movies, movie_id, menu="paths", wanted_tags=args[1:]
         )
 
-    @subCallback(cmd="add")
+    @clear
+    @callback(cmd="add")
     @authorized(min_auth_level=1)
-    async def cmd_add(self, update, context, args):
+    async def btn_add(self, update, context, args):
         movie_id = int(args[0])
         chat_id = update.callback_query.message.chat.id
 
@@ -369,10 +339,12 @@ class Radarr(ArrService):
         self.session_db.clear_session(chat_id)
 
         await update.callback_query.message.reply_text("Movie added!")
+        await update.callback_query.message.delete()
 
-    @subCallback(cmd="remove")
+    @clear
+    @callback(cmd="remove")
     @authorized(min_auth_level=1)
-    async def cmd_remove(self, update, context, args):
+    async def btn_remove(self, update, context, args):
         del context
         chat_id = update.callback_query.message.chat.id
 
@@ -380,10 +352,12 @@ class Radarr(ArrService):
         self.session_db.clear_session(chat_id)
 
         await update.callback_query.message.reply_text("Movie removed!")
+        await update.callback_query.message.delete()
 
-    @subCallback(cmd="cancel")
+    @clear
+    @callback(cmd="cancel")
     @authorized(min_auth_level=1)
-    async def cmd_cancel(self, update, context, args):
+    async def btn_cancel(self, update, context, args):
         del context
         chat_id = update.callback_query.message.chat.id
 
