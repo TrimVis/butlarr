@@ -22,10 +22,7 @@ def get_help_handler(services):
             response_message += f"\n - `/{cmd} <search string>`"
 
     async def handler(update, context):
-        await update.message.reply_text(
-            response_message,
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(response_message, parse_mode="Markdown")
 
     return CommandHandler(HELP_COMMAND, handler)
 
@@ -33,6 +30,9 @@ def get_help_handler(services):
 def get_clbk_handler(services):
     async def handler(update, context):
         args = shlex.split(update.callback_query.data.strip())
+        if args[0] == "noop":
+            await update.callback_query.answer()
+            return
         for s in services:
             if args[0] == s.commands[0]:
                 return await s.handle_callback(update, context)

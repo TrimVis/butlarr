@@ -126,6 +126,15 @@ class Radarr(ArrService):
                 for p in self.quality_profiles
             ]
         else:
+            if in_library:
+                monitored = item.get("monitored", True)
+                missing = not item.get("hasFile", False)
+                rows_menu = [
+                    [
+                        Button("📺 Monitored" if monitored else "Unmonitored"),
+                        Button("💾 Missing" if missing else "Downloaded"),
+                    ]
+                ]
             row_navigation = [
                 (
                     Button("⬅ Prev", self.get_clbk("goto", state.index - 1))
@@ -231,6 +240,33 @@ class Radarr(ArrService):
         )
 
         return self.create_message(state, full_redraw=True)
+
+    # @repaint
+    # @command(cmds=["dl-queue"])
+    # @authorized(min_auth_level=1)
+    # async def cmd_queue(self, update, context, args):
+    #     title = " ".join(args)
+    #     items = self.lookup(title)
+    #     state = State(
+    #         items=items,
+    #         index=0,
+    #         root_folder=find_first(
+    #             self.root_folders,
+    #             lambda x: items[0].get("folderName").startswith(x.get("path")),
+    #         ),
+    #         quality_profile=find_first(
+    #             self.quality_profiles,
+    #             lambda x: items[0].get("qualityProfileId") == x.get("id"),
+    #         ),
+    #         tags=items[0].get("tags", []),
+    #         menu=None,
+    #     )
+
+    #     self.session_db.add_session_entry(
+    #         default_session_state_key_fn(self, update), state
+    #     )
+
+    #     return self.create_message(state, full_redraw=True)
 
     @repaint
     @callback(

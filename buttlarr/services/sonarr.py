@@ -126,6 +126,15 @@ class Sonarr(ArrService):
                 for p in self.quality_profiles
             ]
         else:
+            if in_library:
+                monitored = item.get("monitored", True)
+                missing = not item.get("hasFile", False)
+                rows_menu = [
+                    [
+                        Button("📺 Monitored" if monitored else "Unmonitored"),
+                        Button("💾 Missing" if missing else "Downloaded"),
+                    ]
+                ]
             row_navigation = [
                 (
                     Button("⬅ Prev", self.get_clbk("goto", state.index - 1))
