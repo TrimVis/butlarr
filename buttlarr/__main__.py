@@ -5,7 +5,7 @@ from telegram.ext import Application
 from .database import Database
 from .config.secrets import TELEGRAM_TOKEN
 from .config.services import SERVICES 
-from .tg_handler import get_clbk_handler
+from .tg_handler import get_clbk_handler, get_help_handler
 from .tg_handler.auth import get_auth_handler
 
 
@@ -24,7 +24,7 @@ def main():
     application.add_handler(get_auth_handler(db))
 
     logger.info('Registering help commands...')
-    # TODO pjordan: Add this
+    application.add_handler(get_help_handler(SERVICES))
 
     logger.info('Registering services..')
     for s in SERVICES:

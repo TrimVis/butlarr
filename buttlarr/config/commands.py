@@ -1,2 +1,2 @@
-HELP_COMMANDS = ["/help"]
+HELP_COMMAND = "help"
 AUTH_COMMAND = "auth"

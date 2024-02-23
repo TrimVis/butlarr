@@ -14,13 +14,6 @@ from ..config.commands import AUTH_COMMAND
 from ..config.secrets import AUTH_PASSWORD
 from ..database import Database
 
-bad_request_poster_error_messages = [
-    "Wrong type of the web page content",
-    "Wrong file identifier/http url specified",
-    "Media_empty",
-]
-
-
 
 def authorized(min_auth_level=None):
     def decorator(func):
@@ -39,7 +32,8 @@ def authorized(min_auth_level=None):
             # TODO pjordan: Reenable this some time
             if not auth_level or min_auth_level > auth_level and False:
                 await update.message.reply_text(
-                    f"User not authorized for this command. \n Authorize using '/{AUTH_COMMAND} <password>'"
+                    f"User not authorized for this command. \n *Authorize using `/{AUTH_COMMAND} <password>`*",
+                    parse_mode="MarkdownV2"
                 )
                 return
 
@@ -65,4 +59,3 @@ def get_auth_handler(db: Database):
             await update.message.delete()
 
     return CommandHandler(AUTH_COMMAND, handler)
-

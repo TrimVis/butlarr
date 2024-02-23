@@ -5,9 +5,29 @@ from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
 
-from ..config.commands import AUTH_COMMAND
+from ..config.commands import AUTH_COMMAND, HELP_COMMAND
 from ..config.secrets import AUTH_PASSWORD
 from ..database import Database
+
+
+def get_help_handler(services):
+    response_message = f"""
+    Welcome to *buttlarr*! \n
+    *buttlarr* is a bot that helps you interact with various **arr** services. \n
+    To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
+    After doing so you can interact with the various services using:
+    """
+    for s in services:
+        for cmd in s.commands:
+            response_message += f"\n - `/{cmd} <search string>`"
+
+    async def handler(update, context):
+        await update.message.reply_text(
+            response_message,
+            parse_mode="Markdown"
+        )
+
+    return CommandHandler(HELP_COMMAND, handler)
 
 
 def get_clbk_handler(services):
