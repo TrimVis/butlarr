@@ -38,8 +38,6 @@ class Radarr(ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-        allow_path_selection=True,
-        allow_tag_selection=True,
         id="Radarr",
     ):
         self.session_db = SessionDatabase()
@@ -61,8 +59,7 @@ class Radarr(ArrService):
         self.api_version = status.get("version", "")
 
         self.root_folders = self.get_root_folders()
-        self.allow_path_selection = allow_path_selection
-        self.allow_tag_selection = allow_tag_selection
+        self.quality_profiles = self.get_quality_profiles()
 
     def search(self, term: str = None, *, is_tmdb_id=False):
         if not term:
@@ -126,6 +123,9 @@ class Radarr(ArrService):
     def get_quality_profiles(self):
         return self.request("qualityprofile", fallback=[])
 
+    def get_quality_profile(self, id):
+        return self.request(f"qualityprofile/{id}", fallback=[])
+
     # TODO pjordan: Add quality selection
     def create_message(self, state: State, full_redraw=False):
         movie = state.movies[state.index]
@@ -146,7 +146,7 @@ class Radarr(ArrService):
                 [
                     InlineKeyboardButton(
                         f"{'Change' if in_library else 'Select'} Quality   ({state.quality_profile.get('name', '-')})",
-                        callback_data=construct_command("path", index),
+                        callback_data=construct_command("quality", index),
                     ),
                 ],
                 [
@@ -173,16 +173,20 @@ class Radarr(ArrService):
                 )
             ]
         elif menu == "tags":
-            tags = self.get_all_tags() or []
+            tags = self.get_tags() or []
             rows_menu = [
                 (
                     [
                         InlineKeyboardButton(
-                            f"Tag {tag}" if tag not in wanted_tags else f"Remove {tag}",
-                            callback_data=construct_command("addtag", i),
+                            (
+                                f"Tag {tag.get('label', '-')}"
+                                if tag not in wanted_tags
+                                else f"Remove {tag.get('label', '-')}"
+                            ),
+                            callback_data=construct_command("addtag", tag.get("id")),
                         )
                     ]
-                    for (i, tag) in enumerate(tags)
+                    for tag in tags
                 ),
                 [
                     InlineKeyboardButton(
@@ -195,19 +199,33 @@ class Radarr(ArrService):
                 InlineKeyboardButton("=== Selecting Tags ===", callback_data="noop")
             ]
         elif menu == "path":
-            paths = self.get_root_folders() or []
             rows_menu = [
                 [
                     InlineKeyboardButton(
-                        f"{p}",
-                        callback_data=construct_command("selectpath", p),
+                        p.get("path", "-"),
+                        callback_data=construct_command("selectpath", p.get("id")),
                     )
                 ]
-                for p in paths
+                for p in self.root_folders
             ]
             row_navigation = [
                 InlineKeyboardButton(
                     "=== Selecting Root Folder ===", callback_data="noop"
+                )
+            ]
+        elif menu == "quality":
+            rows_menu = [
+                [
+                    InlineKeyboardButton(
+                        p.get("name", "-"),
+                        callback_data=construct_command("selectquality", p.get("id")),
+                    )
+                ]
+                for p in self.quality_profiles
+            ]
+            row_navigation = [
+                InlineKeyboardButton(
+                    "=== Selecting Quality Profile ===", callback_data="noop"
                 )
             ]
         else:
@@ -339,7 +357,6 @@ class Radarr(ArrService):
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_tags_list(self, update, context, args, state):
-        print(state.movies[state.index])
         return self.create_message(replace(state, tags=[], menu="tags"))
 
     @repaint
@@ -347,7 +364,6 @@ class Radarr(ArrService):
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_tags_add(self, update, context, args, state):
-        print(state.movies[state.index])
         return self.create_message(replace(state, tags=[*state.tags, args[0]]))
 
     @repaint
@@ -355,7 +371,6 @@ class Radarr(ArrService):
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_tags_rem(self, update, context, args, state):
-        print(state.movies[state.index])
         return self.create_message(
             replace(state, tags=[t for t in state.tags if t != args[0]])
         )
@@ -365,15 +380,32 @@ class Radarr(ArrService):
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_path_list(self, update, context, args, state):
-        root_folders = self.get_root_folders()
-        return self.create_message(state, root_folders=root_folders, menu="path")
+        return self.create_message(replace(state, menu="path"))
 
     @repaint
     @callback(cmd="selectpath")
     @sessionState()
     @authorized(min_auth_level=1)
     async def btn_path_select(self, update, context, args, state):
-        return self.create_message(replace(state, path=args[0], menu=None))
+        path = self.get_root_folder(args[0])
+        return self.create_message(replace(state, root_folder=path, menu="add"))
+
+    @repaint
+    @callback(cmd="quality")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_quality_list(self, update, context, args, state):
+        return self.create_message(replace(state, menu="quality"))
+
+    @repaint
+    @callback(cmd="selectquality")
+    @sessionState()
+    @authorized(min_auth_level=1)
+    async def btn_quality_select(self, update, context, args, state):
+        quality_profile = self.get_quality_profile(args[0])
+        return self.create_message(
+            replace(state, quality_profile=quality_profile, menu="add")
+        )
 
     @repaint
     @callback(cmd="addmenu")
@@ -390,9 +422,9 @@ class Radarr(ArrService):
         # Add the movie
         self.add(
             movie=state.movies[state.index],
-            quality_profile=state.quality_profile.get('id', 0),
+            quality_profile=state.quality_profile.get("id", 0),
             tags=state.tags,
-            root_folder=state.root_folder.get('path', ''),
+            root_folder=state.root_folder.get("path", ""),
         )
 
         # Clear session db
