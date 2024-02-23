@@ -1,7 +1,7 @@
 from urllib.parse import quote
 from loguru import logger
 from typing import Optional, List, Any, Literal
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -307,20 +307,20 @@ class Radarr(ArrService):
     @callback(cmd="goto")
     @sessionState()
     @authorized(min_auth_level=1)
-    async def btn_goto(self, update, context, args):
+    async def btn_goto(self, update, context, args, state):
         return self.create_message(replace(state, index=int(args[0])))
 
     @repaint
     @callback(cmd="tags")
     @sessionState()
     @authorized(min_auth_level=1)
-    async def btn_tags(self, update, context, args):
+    async def btn_tags(self, update, context, args, state):
         return self.create_message(state)
 
     @repaint
     @callback(cmd="path")
     @authorized(min_auth_level=1)
-    async def btn_path(self, update, context, args):
+    async def btn_path(self, update, context, args, state):
         return self.create_message(state)
 
     @clear
@@ -345,12 +345,12 @@ class Radarr(ArrService):
     @callback(cmd="remove")
     @sessionState(clear=True)
     @authorized(min_auth_level=1)
-    async def btn_remove(self, update, context, args):
+    async def btn_remove(self, update, context, args, state):
         return "Movie removed!"
 
     @clear
     @callback(cmd="cancel")
     @sessionState(clear=True)
     @authorized(min_auth_level=1)
-    async def btn_cancel(self, update, context, args):
+    async def btn_cancel(self, update, context, args, state):
         return "Search canceled!"

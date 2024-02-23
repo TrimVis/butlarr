@@ -25,7 +25,7 @@ class SessionDatabase:
         file_path = os.path.join(self.base_path, file_name)
 
         logger.debug(f"Adding session data for {file_name}")
-        logger.debug(f"Value {value}")
+        # logger.debug(f"Value {value}")
         with open(file_path, mode="wb+") as file:
             pickle.dump(value, file)
 
@@ -36,7 +36,7 @@ class SessionDatabase:
         logger.debug(f"Fetching session data of {file_name}")
         with open(file_path, mode="rb+") as file:
             result = pickle.load(file)
-            logger.debug(f"Result {result}")
+            # logger.debug(f"Result {result}")
             return result
 
     def clear_session(self, session_id):
