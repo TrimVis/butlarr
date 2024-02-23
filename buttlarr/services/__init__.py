@@ -9,6 +9,7 @@ from ..session_database import SessionDatabase
 class Action(Enum):
     GET = "get"
     POST = "post"
+    DELETE = "delete"
 
 
 class ArrVariants(Enum):
@@ -37,16 +38,26 @@ class ArrService(TelegramHandler):
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
         )
 
-    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None):
-        r = (
-            self._get(endpoint, params)
-            if action == Action.GET
-            else self._post(endpoint, params)
+    def _delete(self, endpoint, params={}):
+        return requests.delete(
+            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
         )
+
+    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None):
+        r = None
+        if action == Action.GET:
+            r = self._get(endpoint, params)
+        elif action == Action.POST:
+            r = self._post(endpoint, params)
+        elif action == Action.DELETE:
+            r = self._delete(endpoint, params)
+
         if not r:
             return fallback
 
-        return r.json()
+        if action != Action.DELETE:
+            return r.json()
+        return r
 
     def detect_api(self, api_host):
         # Detect version and api_url
@@ -87,9 +98,7 @@ class ArrService(TelegramHandler):
         monitored=True,
         options={},
     ):
-        assert (
-            item
-        ), "Missing required arg! You need to provide a item!"
+        assert item, "Missing required arg! You need to provide a item!"
 
         return self.request(
             self.arr_variant.value,
@@ -103,6 +112,13 @@ class ArrService(TelegramHandler):
                 "minimumAvailability": min_availability,
                 **options,
             },
+        )
+
+    def remove(self, *, id=None):
+        assert id, "Missing required arg! You need to provide a id!"
+        return self.request(
+            f"{self.arr_variant.value}/{id}",
+            action=Action.DELETE,
         )
 
     def get_root_folders(self) -> List[str]:

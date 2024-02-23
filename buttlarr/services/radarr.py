@@ -284,6 +284,7 @@ class Radarr(ArrService):
 
             return Response(caption="Movie added!")
         elif args[0] == "remove":
+            self.remove(id=state.items[state.index].get("id"))
             return Response(caption="Movie removed!")
         elif args[0] == "cancel":
             return Response(caption="Search canceled!")
