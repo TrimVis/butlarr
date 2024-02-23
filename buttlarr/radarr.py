@@ -390,9 +390,9 @@ class Radarr(ArrService):
         # Add the movie
         self.add(
             movie=state.movies[state.index],
-            quality_profile=state.quality_profile,
+            quality_profile=state.quality_profile.get('id', 0),
             tags=state.tags,
-            root_folder=state.root_folder,
+            root_folder=state.root_folder.get('path', ''),
         )
 
         # Clear session db
