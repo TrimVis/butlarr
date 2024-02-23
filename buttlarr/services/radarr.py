@@ -1,9 +1,6 @@
-from urllib.parse import quote
 from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
-
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 from . import ArrService, Action, ArrVariants
 from ..tg_handler import command, callback, handler
@@ -41,10 +38,7 @@ class Radarr(ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-        id="Radarr",
     ):
-
-        self.id = id
         self.commands = commands
         self.api_key = api_key
 
@@ -221,7 +215,9 @@ class Radarr(ArrService):
         quality_profile = self.get_quality_profiles()[0]
         state = State(items, 0, quality_profile, [], root_folder, None)
 
-        self.session_db.add_session_entry(default_session_state_key_fn(self.id, update), state)
+        self.session_db.add_session_entry(
+            default_session_state_key_fn(self, update), state
+        )
 
         return self.create_message(state, full_redraw=True)
 

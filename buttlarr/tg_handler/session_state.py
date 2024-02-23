@@ -21,8 +21,8 @@ def get_chat_id(update):
     return update.message.chat_id
 
 
-def default_session_state_key_fn(sid: str, update):
-    return str(sid) + str(get_chat_id(update))
+def default_session_state_key_fn(self, update):
+    return str(self.commands[0]) + str(get_chat_id(update))
 
 
 def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
@@ -35,7 +35,7 @@ def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
                 return await func(self, update, context, *args, **kwargs)
 
             # get state
-            key = key_fn(self.id, update)
+            key = key_fn(self, update)
             state = self.session_db.get_session_entry(key)
             result = await func(self, update, context, *args, **kwargs, state=state)
 
