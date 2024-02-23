@@ -1,13 +1,32 @@
 from urllib.parse import quote
 from loguru import logger
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
+from dataclasses import dataclass
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .session_database import SessionDatabase
 from .common import ArrService, Action
 from .tg_handler import command, callback, handler
-from .tg_handler_ext import construct_command, Response, authorized, repaint, clear
+from .tg_handler_ext import (
+    construct_command,
+    Response,
+    authorized,
+    repaint,
+    clear,
+    sessionState,
+    default_session_state_key_fn,
+)
+
+
+@dataclass(frozen=True)
+class State:
+    movies: List[Any]
+    index: int
+    quality_profile: str
+    tags: List[str]
+    path: str
+    menu: Optional[Literal["path"] | Literal["tags"] | Literal["quality_profile"]]
 
 
 @handler
@@ -106,8 +125,12 @@ class Radarr(ArrService):
         return self.request("qualityprofile", fallback=[])
 
     # TODO pjordan: Add quality selection
-    def create_message(self, movies, index, menu=None, wanted_tags=[]):
-        movie = movies[index]
+    def create_message(self, state: State):
+        movie = state.movies[state.index]
+        movies = state.movies
+        index = state.index
+        menu = state.menu
+        wanted_tags = state.tags
 
         keyboard_nav_row = [
             (
@@ -272,90 +295,62 @@ class Radarr(ArrService):
     @authorized(min_auth_level=1)
     async def cmd_default(self, update, context, args):
         title = " ".join(args[1:])
-        chat_id = update.message.chat.id
 
-        # Search movies and store the results in the session db
         movies = self.search(title) or []
-        self.session_db.add_session_entry(chat_id, movies, key="movies")
+        state = State(movies, 0, "", [], "", None)
 
-        return self.create_message(movies, 0)
+        self.session_db.add_session_entry(default_session_state_key_fn(update), state)
+
+        return self.create_message(state)
 
     @repaint
     @callback(cmd="goto")
+    @sessionState()
     @authorized(min_auth_level=1)
     async def btn_goto(self, update, context, args):
-        movie_id = int(args[0])
-        chat_id = update.callback_query.message.chat.id
-
-        # Retrieve movies from the session db
-        movies = self.session_db.get_session_entry(chat_id, key="movies")
-
-        return self.create_message(movies, movie_id)
+        return self.create_message(replace(state, index=int(args[0])))
 
     @repaint
     @callback(cmd="tags")
+    @sessionState()
     @authorized(min_auth_level=1)
     async def btn_tags(self, update, context, args):
-        movie_id = int(args[0])
-        chat_id = update.callback_query.message.chat.id
-
-        # Retrieve movies from the session db
-        movies = self.session_db.get_session_entry(chat_id, key="movies")
-
-        return self.create_message(movies, movie_id)
+        return self.create_message(state)
 
     @repaint
     @callback(cmd="path")
     @authorized(min_auth_level=1)
     async def btn_path(self, update, context, args):
-        movie_id = int(args[0])
-        chat_id = update.callback_query.message.chat.id
-
-        # Retrieve movies from the session db
-        movies = self.session_db.get_session_entry(chat_id, key="movies")
-
-        return self.create_message(movies, movie_id)
+        return self.create_message(state)
 
     @clear
     @callback(cmd="add")
+    @sessionState(clear=True)
     @authorized(min_auth_level=1)
-    async def btn_add(self, update, context, args):
-        movie_id = int(args[0])
-        chat_id = update.callback_query.message.chat.id
-
-        # Retrieve movies from the session db
-        movies = self.session_db.get_session_entry(chat_id, key="movies")
-
+    async def btn_add(self, update, context, args, state):
         # Add the movie
-        self.add(movie=movies[movie_id], quality_profile=args[1], tags=args[2:])
+        self.add(
+            movie=state.movies[state.index],
+            quality_profile=state.quality_profile,
+            tags=state.tags,
+        )
 
         # Clear session db & remove context
         del context
         del movies
-        self.session_db.clear_session(chat_id)
 
         return "Movie added!"
 
     @clear
     @callback(cmd="remove")
+    @sessionState(clear=True)
     @authorized(min_auth_level=1)
     async def btn_remove(self, update, context, args):
-        del context
-        chat_id = update.callback_query.message.chat.id
-
-        # Clear session db
-        self.session_db.clear_session(chat_id)
-
         return "Movie removed!"
 
     @clear
     @callback(cmd="cancel")
+    @sessionState(clear=True)
     @authorized(min_auth_level=1)
     async def btn_cancel(self, update, context, args):
-        del context
-        chat_id = update.callback_query.message.chat.id
-
-        # Clear session db
-        self.session_db.clear_session(chat_id)
-
         return "Search canceled!"

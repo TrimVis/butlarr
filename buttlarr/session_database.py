@@ -21,13 +21,13 @@ class SessionDatabase:
         self.base_path.mkdir(exist_ok=True, parents=True)
 
     def add_session_entry(self, session_id, value, *, key=None):
-        file_name = f"{session_id}.{key}" if key else session_id
+        file_name = f"{session_id}.{key}" if key else str(session_id)
         file_path = os.path.join(self.base_path, file_name)
         with open(file_path, mode="wb+") as file:
             pickle.dump(value, file)
 
     def get_session_entry(self, session_id, *, key=None):
-        file_name = f"{session_id}.{key}" if key else session_id
+        file_name = f"{session_id}.{key}" if key else str(session_id)
         file_path = os.path.join(self.base_path, file_name)
         with open(file_path, mode="rb+") as file:
             return pickle.load(file)

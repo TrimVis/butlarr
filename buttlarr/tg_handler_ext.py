@@ -83,6 +83,30 @@ def repaint(func):
     return wrapped_func
 
 
+def default_session_state_key_fn(update):
+    if update.callback_query:
+        return update.callback_query.message.chat_id
+    return update.message.chat_id
+
+
+def sessionState(key_fn=default_session_state_key_fn, clear=False):
+    def decorator(func):
+        @wraps(func)
+        async def wrapped_func(self, update, context, *args, **kwargs):
+            # get state
+            chat_id = default_session_state_key_fn(update)
+            state = self.session_db.get_session_entry(chat_id)
+            result = await func(self, update, context, *args, **kwargs, state=state)
+
+            if clear:
+                self.session_db.clear_session(chat_id)
+            return result
+
+        return wrapped_func
+
+    return decorator
+
+
 def authorized(min_auth_level=None):
     def decorator(func):
         assert min_auth_level, "Missing required arg min_auth_level"
