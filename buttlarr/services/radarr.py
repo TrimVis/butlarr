@@ -5,22 +5,21 @@ from dataclasses import dataclass, replace
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
-from .session_database import SessionDatabase
-from .common import ArrService, Action
-from .tg_handler import command, callback, handler, construct_command
-from .tg_handler.message import (
+from . import ArrService, Action
+from ..tg_handler import command, callback, handler, construct_command
+from ..tg_handler.message import (
     Response,
     repaint,
     clear,
 )
-from .tg_handler.auth import (
+from ..tg_handler.auth import (
     authorized,
 )
-from .tg_handler.session_state import (
+from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
 )
-from .tg_handler.keyboard import Button, keyboard
+from ..tg_handler.keyboard import Button, keyboard
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,6 @@ class Radarr(ArrService):
         api_key: str,
         id="Radarr",
     ):
-        self.session_db = SessionDatabase()
 
         self.id = id
         self.commands = commands
@@ -288,6 +286,7 @@ class Radarr(ArrService):
 
     @repaint
     @command(default=True)
+    @sessionState(init=True)
     @authorized(min_auth_level=1)
     async def cmd_default(self, update, context, args):
         title = " ".join(args)

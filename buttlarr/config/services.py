@@ -1,4 +1,4 @@
-from ..radarr import Radarr
+from ..services.radarr import Radarr
 from .secrets import API_KEYS
 
 SERVICES = [

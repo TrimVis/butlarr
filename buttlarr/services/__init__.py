@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Tuple, Optional, Any
 import requests
-from .tg_handler import TelegramHandler
-from .session_database import SessionDatabase
+from ..tg_handler import TelegramHandler
+from ..session_database import SessionDatabase
 
 
 class Action(Enum):

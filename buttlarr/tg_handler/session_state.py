@@ -12,7 +12,7 @@ from typing import Any
 
 from ..config.commands import AUTH_COMMAND
 from ..config.secrets import AUTH_PASSWORD
-from ..database import Database
+from ..session_database import SessionDatabase
 
 
 def default_session_state_key_fn(update):
@@ -21,10 +21,19 @@ def default_session_state_key_fn(update):
     return update.message.chat_id
 
 
-def sessionState(key_fn=default_session_state_key_fn, clear=False):
+def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
     def decorator(func):
+
         @wraps(func)
         async def wrapped_func(self, update, context, *args, **kwargs):
+
+            # init calls do not need a state, as they will create it first
+            if init:
+                self.session_db = SessionDatabase()
+                return await func(self, update, context, *args, **kwargs)
+            elif not self.session_db:
+                self.session_db = SessionDatabase()
+
             # get state
             chat_id = default_session_state_key_fn(update)
             state = self.session_db.get_session_entry(chat_id)
