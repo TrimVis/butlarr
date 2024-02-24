@@ -1,6 +1,6 @@
 import shlex
 
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, Optional, Literal
 from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
@@ -27,6 +27,9 @@ class Response:
     caption: str = ""
     reply_markup: Optional[Any] = None
     state: Optional[Any] = None
+    parse_mode: Optional[
+        Literal["Markdown"] | Literal["MarkdownV2"] | Literal["HTML"]
+    ] = None
 
 
 def clear(func):
@@ -59,7 +62,7 @@ def repaint(func):
                 await update.message.reply_text(
                     message.caption,
                     reply_markup=message.reply_markup,
-                    parse_mode="Markdown",
+                    parse_mode=message.parse_mode,
                 )
         else:
             try:
@@ -96,3 +99,28 @@ def repaint(func):
                     await update.callback_query.message.delete()
 
     return wrapped_func
+
+
+def escape_markdownv2_chars(text: str):
+    for c in [
+        "_",
+        "*",
+        "[",
+        "]",
+        "(",
+        ")",
+        "~",
+        "`",
+        ">",
+        "#",
+        "+",
+        "-",
+        "=",
+        "|",
+        "{",
+        "}",
+        ".",
+        "!",
+    ]:
+        text = text.replace(c, f"\{c}")
+    return text

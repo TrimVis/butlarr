@@ -2,16 +2,13 @@ from typing import Dict, Any
 import math
 
 from . import ArrService
+from dataclasses import dataclass
+from ..config.queue import WIDTH, PAGE_SIZE
+
 from ..tg_handler.keyboard import keyboard
 from ..tg_handler.message import Response
-from dataclasses import dataclass
-
 from ..tg_handler import command, callback, handler
-from ..tg_handler.message import (
-    Response,
-    repaint,
-    clear,
-)
+from ..tg_handler.message import Response, repaint, clear, escape_markdownv2_chars
 from ..tg_handler.auth import (
     authorized,
 )
@@ -39,16 +36,22 @@ class ExtArrService(ArrService):
         lines = ["*Queue*"]
         for item in state.items["records"]:
             percent = 1.0 - (float(item.get("sizeleft", 0)) / item.get("size", 1))
-            progress = math.floor(percent * 15)
-            remaining = math.ceil((1.0 - percent) * 15)
+            progress = math.floor(percent * WIDTH)
+            remaining = math.ceil((1.0 - percent) * WIDTH)
+            status = item.get("status", "-")
 
-            title_ln = " - " + item.get("title", "")[0:25]
-            progress_ln = f"`[{progress * '='}|{(remaining*' ')}]` {(percent*100):.2f}%"
+            title = escape_markdownv2_chars(item.get("title", "")[0 : 2 * WIDTH])
+            title_ln = f"*{title}*"
+            progress_ln = (
+                f">`[{progress * '='}|{(remaining*' ')}]` {(percent*100):.0f}%"
+            )
+            status_ln = f">Status: _{item.get('status', 'N/A')}_    Time left: _{item.get('timeleft', 'N/A')}_"
 
-            lines += [title_ln, progress_ln]
+            lines += [title_ln, progress_ln, status_ln]
 
         if not len(state.items["records"]):
-            lines += [5 * "\n", "\t_No Entries_", 5 * "\n"]
+            n = PAGE_SIZE // 4
+            lines += [n * "\n", "\t_No Entries_", n * "\n"]
         elif len(lines) < state.page_size:
             lines += [(state.page_size - len(lines)) * "\n"]
 
@@ -62,15 +65,16 @@ class ExtArrService(ArrService):
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
+            parse_mode="MarkdownV2",
         )
 
     async def cmd_queue(self, update, context, args):
-        items = self.get_queue(page=0, page_size=15)
+        items = self.get_queue(page=0, page_size=PAGE_SIZE)
 
         state = QueueState(
             items=items,
             page=0,
-            page_size=15,
+            page_size=PAGE_SIZE,
         )
 
         self.session_db.add_session_entry(
