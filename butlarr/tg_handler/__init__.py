@@ -12,8 +12,8 @@ from ..database import Database
 
 def get_help_handler(services):
     response_message = f"""
-    Welcome to *buttlarr*! \n
-    *buttlarr* is a bot that helps you interact with various **arr** services. \n
+    Welcome to *butlarr*! \n
+    *butlarr* is a bot that helps you interact with various **arr** services. \n
     To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
     After doing so you can interact with the various services using:
     """

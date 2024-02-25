@@ -2,4 +2,4 @@ venv/
 __pycache__
 *.db
 data/
-buttlarr/config/secrets.py
+butlarr/config/secrets.py

@@ -39,11 +39,11 @@ python -m venv venv && source venv/bin/activate
 4. Configure butlarr (see *Configuration*)
 5. Start the service
 ```bash
-python -m buttlarr
+python -m butlarr
 ```
 
 ### Configuration
-After cloning the repository and `cd`ing into the repository, create a new file at `buttlarr/config/secrets.py`.
+After cloning the repository and `cd`ing into the repository, create a new file at `butlarr/config/secrets.py`.
 Paste and adapt the following template `secrets.py`:
 ```python
 TELEGRAM_TOKEN = "<YOUR_TELEGRAM_TOKEN>"
@@ -74,13 +74,13 @@ After            = network-online.target
 [Service]
 Type              = simple
 WorkingDirectory  = /home/peasant/butlarr
-ExecStart         = /bin/bash -c 'source venv/bin/activate; python -m buttlarr'
+ExecStart         = /bin/bash -c 'source venv/bin/activate; python -m butlarr'
 ExecReload        = /bin/kill -s HUP $MAINPID
 KillMode          = mixed
 TimeoutStopSec    = 300
 Restart           = always
 RestartSec        = 60
-SyslogIdentifier  = buttlar
+SyslogIdentifier  = butlar
 
 [Install]
 WantedBy         = multi-user.target
@@ -91,6 +91,5 @@ Enable it to start on reboots using: `systemctl --user enable butlarr`
 
 
 ## Open TODOs:
- - [ ] Fix the 'buttler' typo (rename all 'buttlarr' references to 'butlarr')
  - [ ] Create docker instructions
  - [ ] Create a pip package
