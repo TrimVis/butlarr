@@ -61,6 +61,34 @@ API_KEYS = [
 ]
 ```
 
+### Systemd service
+Create a new file under `/etc/systemd/user` (recommended: `/etc/systemd/user/butlarr.service`)
+The new file should have following content (you have to adapt the `REPO_PATH`):
+```
+[Unit]
+Description      = Butlarr Telegram Bot for Arr Service Managment
+After            = network.target
+After            = systemd-user-sessions.service
+After            = network-online.target
+
+[Service]
+Type              = simple
+WorkingDirectory  = /home/peasant/butlarr
+ExecStart         = /bin/bash -c 'source venv/bin/activate; python -m buttlarr'
+ExecReload        = /bin/kill -s HUP $MAINPID
+KillMode          = mixed
+TimeoutStopSec    = 300
+Restart           = always
+RestartSec        = 60
+SyslogIdentifier  = buttlar
+
+[Install]
+WantedBy         = multi-user.target
+```
+
+Start it using: `systemctl --user start butlarr`
+Enable it to start on reboots using: `systemctl --user enable butlarr`
+
 
 ## Open TODOs:
  - [ ] Fix the 'buttler' typo (rename all 'buttlarr' references to 'butlarr')
