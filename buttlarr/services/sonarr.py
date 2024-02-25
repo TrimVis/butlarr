@@ -250,6 +250,12 @@ class Sonarr(ExtArrService, ArrService):
         return await ExtArrService.cmd_queue(self, update, context, args)
 
     @repaint
+    @callback(cmds=["queue"])
+    @authorized(min_auth_level=1)
+    async def clbk_queue(self, update, context, args):
+        return await ExtArrService.clbk_queue(self, update, context, args)
+
+    @repaint
     @callback(
         cmds=[
             "goto",

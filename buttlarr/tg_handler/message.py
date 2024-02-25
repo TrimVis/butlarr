@@ -20,6 +20,8 @@ bad_request_poster_error_messages = [
     "Media_empty",
 ]
 
+no_caption_error_messages = ["There is no caption in the message to edit"]
+
 
 @dataclass(frozen=True)
 class Response:
@@ -54,10 +56,21 @@ def repaint(func):
         if not message.photo:
             if update.callback_query:
                 await update.callback_query.answer()
-                await update.callback_query.edit_message_caption(
-                    reply_markup=message.reply_markup,
-                    caption=message.caption,
-                )
+                try:
+                    await update.callback_query.edit_message_caption(
+                        reply_markup=message.reply_markup,
+                        caption=message.caption,
+                        parse_mode=message.parse_mode,
+                    )
+                except BadRequest as e:
+                    if str(e) in no_caption_error_messages:
+                        await update.callback_query.edit_message_text(
+                            message.caption,
+                            reply_markup=message.reply_markup,
+                            parse_mode=message.parse_mode,
+                        )
+                    else:
+                        raise e
             else:
                 await update.message.reply_text(
                     message.caption,
@@ -92,7 +105,7 @@ def repaint(func):
                         reply_markup=message.reply_markup,
                     )
                 else:
-                    raise
+                    raise e
             finally:
                 if update.callback_query:
                     await update.callback_query.answer()

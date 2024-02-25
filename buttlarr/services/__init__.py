@@ -93,9 +93,9 @@ class ArrService(TelegramHandler):
 
     def get_queue(self, page: int = None, page_size: int = None):
         params = {}
-        if page:
+        if page != None:
             params["page"] = page
-        if page_size:
+        if page_size != None:
             params["page_size"] = page_size
         return self.request(
             "queue",

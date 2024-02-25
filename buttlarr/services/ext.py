@@ -29,19 +29,34 @@ class QueueState:
 @handler
 class ExtArrService(ArrService):
     @keyboard
-    def create_queue_keyboard(self, state):
-        return []
+    def create_queue_keyboard(self, state: QueueState):
+        total_pages = int(state.items["totalRecords"]) // state.page_size
+        return [
+            [
+                (
+                    Button("Prev page", self.get_clbk("queue", state.page - 1))
+                    if state.page > 0
+                    else Button()
+                ),
+                (
+                    Button("Next page", self.get_clbk("queue", state.page + 1))
+                    if state.page < total_pages
+                    else Button()
+                ),
+            ],
+        ]
 
     def create_queue_message(self, state: QueueState, full_redraw=False):
-        lines = ["*Queue*"]
-        for item in state.items["records"]:
+        lines = ["*Queue*", ""]
+        offset = state.page * state.page_size + 1
+        for idx, item in enumerate(state.items["records"]):
             percent = 1.0 - (float(item.get("sizeleft", 0)) / item.get("size", 1))
             progress = math.floor(percent * WIDTH)
             remaining = math.ceil((1.0 - percent) * WIDTH)
             status = item.get("status", "-")
 
             title = escape_markdownv2_chars(item.get("title", "")[0 : 2 * WIDTH])
-            title_ln = f"*{title}*"
+            title_ln = f"{offset + idx}\. *{title}*"
             progress_ln = (
                 f">`[{progress * '='}|{(remaining*' ')}]` {(percent*100):.0f}%"
             )
@@ -77,8 +92,15 @@ class ExtArrService(ArrService):
             page_size=PAGE_SIZE,
         )
 
-        self.session_db.add_session_entry(
-            default_session_state_key_fn(self, update), state
+        return self.create_queue_message(state)
+
+    async def clbk_queue(self, update, context, args):
+        items = self.get_queue(page=int(args[1]), page_size=PAGE_SIZE)
+
+        state = QueueState(
+            items=items,
+            page=int(args[1]),
+            page_size=PAGE_SIZE,
         )
 
-        return self.create_queue_message(state, full_redraw=True)
+        return self.create_queue_message(state)
