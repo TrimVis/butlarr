@@ -60,7 +60,7 @@ class ExtArrService(ArrService):
             progress_ln = (
                 f">`[{progress * '='}|{(remaining*' ')}]` {(percent*100):.0f}%"
             )
-            status_ln = f">Status: _{item.get('status', 'N/A')}_    Time left: _{item.get('timeleft', 'N/A')}_"
+            status_ln = f">Status: _{item.get('status', 'N/A')}_ \(_{item.get('trackedDownloadState', '-')}_\)   Time left: _{item.get('timeleft', 'N/A')}_"
 
             lines += [title_ln, progress_ln, status_ln]
 

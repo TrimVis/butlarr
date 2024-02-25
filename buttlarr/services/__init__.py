@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 from enum import Enum
 from typing import List, Tuple, Optional, Any
 import requests
@@ -71,18 +72,23 @@ class ArrService(TelegramHandler):
         return r
 
     def detect_api(self, api_host):
+        status = None
         # Detect version and api_url
-        self.api_url = f"{api_host.rstrip('/')}/api/v3"
-        status = self.request("system/status")
-        if not status:
-            self.api_url = f"{api_host.rstrip('/')}/api"
+        try:
+            self.api_url = f"{api_host.rstrip('/')}/api/v3"
             status = self.request("system/status")
-            assert not status, "By default only v3 ArrServices are supported"
-
-        assert status, "Could not reach compatible api. Is the service down?"
-        api_version = status.get("version", "")
-        assert api_version, "Could not find compatible api."
-        return api_version
+            if not status:
+                self.api_url = f"{api_host.rstrip('/')}/api"
+                status = self.request("system/status")
+                assert not status, "By default only v3 ArrServices are supported"
+        finally:
+            if status is None:
+                logger.error("Could not reach compatible api. Is the service down?")
+                exit(1)
+            assert status, "Could not reach compatible api. Is the service down?"
+            api_version = status.get("version", "")
+            assert api_version, "Could not find compatible api."
+            return api_version
 
     def get_queue_item(self, id: int):
         return self.request(
