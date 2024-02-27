@@ -84,11 +84,13 @@ def service_setup(hide_done=False):
         )
     assert cmd, "No command found"
 
-    return Service(["/" + cmd], service[0].upper() + service[1:], service, url, api_key)
+    return Service([cmd], service[0].upper() + service[1:], service, url, api_key)
 
 
 def create_services_py(services, write_out=True, base_path="."):
-    imports = "\n".join(["from ..services.radarr import Radarr" for s in services])
+    imports = "\n".join(
+        [f"from ..services.{s.class_file} import {s.class_name}" for s in services]
+    )
     services = "\n".join(
         [
             f"""{s.class_name}(
@@ -148,7 +150,7 @@ def main():
         "If you continue, your inputs will be written out. The current config files will be overwritten!"
     )
     print(
-        f"Make sure to back up {base_path}/config/secrets.py and {base_path}/config/services.py if you want to keep them."
+        f"Make sure to back up {base_path}/butlarr/config/secrets.py and {base_path}/butlarr/config/services.py if you want to keep them."
     )
     if input("Do you want to continue? (y/n)  ").strip().lower() != "y":
         print("Exiting setup. Did not write any config files.")

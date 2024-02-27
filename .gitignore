@@ -3,3 +3,4 @@ __pycache__
 *.db
 data/
 butlarr/config/secrets.py
+backups/

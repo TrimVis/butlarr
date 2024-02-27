@@ -104,14 +104,14 @@ class TelegramHandler:
         args = shlex.split(update.message.text.strip())
         logger.info(f"Received command: {args}")
 
-        if self.sub_commands:
+        if self.sub_commands and len(args) > 1:
             for s, c in self.sub_commands:
                 if args[1] == s:
                     logger.debug(f"Subcommand - Executing {s} ({c.__name__})")
                     await c(self, update, context, args[1:])
                     return
 
-        logger.debug("No matching subcommand registered. Trying fallback")
+            logger.debug("No matching subcommand registered. Trying fallback")
         try:
             await self.default_command(update, context, args[1:])
         except NotImplementedError:
@@ -125,14 +125,14 @@ class TelegramHandler:
         args = shlex.split(update.callback_query.data.strip())
         if args[0] != self.commands[0]:
             return
-        if self.sub_callbacks:
+        if self.sub_callbacks and len(args) > 1:
             for s, c in self.sub_callbacks:
                 if args[1] == s:
                     logger.debug(f"Subcallback - Executing {s} ({c.__name__})")
                     await c(self, update, context, args[1:])
                     return
 
-        logger.debug("No matching subcallback registered. Trying fallback")
+            logger.debug("No matching subcallback registered. Trying fallback")
         try:
             await self.default_callback(update, context, args[1:])
         except NotImplementedError:
