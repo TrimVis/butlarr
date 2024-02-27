@@ -1,0 +1,19 @@
+[Unit]
+Description      = Butlarr Telegram Bot for Arr Service Managment
+After            = network.target
+After            = systemd-user-sessions.service
+After            = network-online.target
+
+[Service]
+Type              = simple
+WorkingDirectory  = /home/peasant/butlarr
+ExecStart         = /bin/bash -c 'source venv/bin/activate; python -m butlarr'
+ExecReload        = /bin/kill -s HUP $MAINPID
+KillMode          = mixed
+TimeoutStopSec    = 300
+Restart           = always
+RestartSec        = 60
+SyslogIdentifier  = butlar
+
+[Install]
+WantedBy         = multi-user.target

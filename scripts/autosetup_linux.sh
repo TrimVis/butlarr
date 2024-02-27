@@ -23,6 +23,7 @@ then
     printf " |> \n |> \n |> \n"
 fi
 
-echo " |> Starting butlarr"
-python -m butlarr
+echo " |> Starting butlarr autosetup"
+python -m butlarr.autosetup
+
 
