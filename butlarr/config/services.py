@@ -1,6 +1,7 @@
 from .secrets import APIS
 
 from ..services.radarr import Radarr
+from ..services.sonarr import Sonarr
 
 SERVICES = [
     Radarr(
