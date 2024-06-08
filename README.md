@@ -1,6 +1,6 @@
 # Butlarr
 >
-> Your personal butler for all your *arr* needs
+> Your personal butler for all your *arr* needs & services
 
 ## Why use Butlarr
 
@@ -11,7 +11,33 @@ It allows the addition and managment of movies, series, and more to come.
 If you have a service that behaves logically the same as Sonarr or Radarr it will be compatible with *Butlarr*.
 Even if it is not compatible, it is relatively simple to extend the exesting code base for various other services.
 
-## Usage
+## Features
+
+### Search
+
+Search for media using `/movie <search term>`, `/series <search term>` or any other configured command
+
+![image](https://github.com/TrimVis/butlarr/assets/29759576/089bb19a-01d6-4d89-bc92-f42128200bf0)
+
+### Library Management
+
+Manage search results from inside telegram.
+Change the quality profile, assign/remove tags, etc.
+
+![image](https://github.com/TrimVis/butlarr/assets/29759576/9bb30521-ba02-4045-9e1a-06e425d64ce7)
+
+### Queue
+
+For sonarr and radarr there is native support to display the queue and it's download progress.
+To use it you can use the `queue` subcommand.
+
+E.g. if you configured sonarr on the `series` command, use:
+
+```bash
+/series queue
+```
+
+## Basic Usage
 
 After following the *Setup* and *Configuration*, ensure that the bot is running.
 If not you can start it using: `python -m butlarr` from the repository directory.
