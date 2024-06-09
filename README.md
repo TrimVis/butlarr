@@ -227,3 +227,5 @@ Enable it to start on reboots using: `systemctl --user enable butlarr`
 
 - [ ] Create a pip package
 - [ ] Add more permission levels
+
+> Developed by TrimVis.
