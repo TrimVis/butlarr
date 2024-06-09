@@ -1,17 +1,28 @@
-from .secrets import APIS
-
+from . import config
 from ..services.radarr import Radarr
 from ..services.sonarr import Sonarr
 
-SERVICES = [
-    Radarr(
-        commands=["movie"],
-        api_host=APIS.get("movie")[0],
-        api_key=APIS.get("movie")[1],
-    ),
-    Sonarr(
-        commands=["series"],
-        api_host=APIS.get("series")[0],
-        api_key=APIS.get("series")[1],
-    ),
-]
+APIS = config["apis"]
+SERVICES = []
+
+for service in config["services"]:
+    service_type = service["type"]
+    commands = service["commands"]
+    api_config = APIS[service["api"]]
+
+    if service_type == "Radarr":
+        SERVICES.append(
+            Radarr(
+                commands=commands,
+                api_host=api_config["api_host"],
+                api_key=api_config["api_key"]
+            )
+        )
+    elif service_type == "Sonarr":
+        SERVICES.append(
+            Sonarr(
+                commands=commands,
+                api_host=api_config["api_host"],
+                api_key=api_config["api_key"]
+            )
+        )

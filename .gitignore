@@ -2,6 +2,7 @@ venv/
 __pycache__
 *.db
 data/
-butlarr/config/secrets.py
-src/butlarr/config/secrets.py
 backups/
+config.yaml
+dist/
+pyproject.toml
