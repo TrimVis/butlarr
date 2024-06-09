@@ -152,6 +152,7 @@ class ArrService(TelegramHandler):
         item=None,
         root_folder_path: str = "",
         quality_profile_id: str = "",
+        language_profile_id: str = "",
         min_availability="released",
         tags: List[str] = [],
         monitored=True,
@@ -165,6 +166,7 @@ class ArrService(TelegramHandler):
             params={
                 **item,
                 "qualityProfileId": quality_profile_id,
+                "languageProfileId": language_profile_id,
                 "rootFolderPath": root_folder_path,
                 "tags": tags,
                 "monitored": monitored,
@@ -201,4 +203,10 @@ class ArrService(TelegramHandler):
         return self.request("qualityprofile", fallback=[])
 
     def get_quality_profile(self, id):
-        return self.request(f"qualityprofile/{id}", fallback=[])
+        return self.request(f"qualityprofile/{id}", fallback={})
+
+    def get_language_profiles(self):
+        return self.request("languageprofile", fallback=[])
+
+    def get_language_profile(self, id):
+        return self.request(f"languageprofile/{id}", fallback={})

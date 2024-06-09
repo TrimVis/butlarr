@@ -10,9 +10,7 @@ from ..tg_handler.message import (
     repaint,
     clear,
 )
-from ..tg_handler.auth import (
-    authorized,
-)
+from ..tg_handler.auth import authorized, AuthLevels, get_auth_level_from_message
 from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
@@ -25,10 +23,15 @@ class State:
     items: List[Any]
     index: int
     quality_profile: str
+    language_profile: str
     tags: List[str]
     root_folder: str
     menu: Optional[
-        Literal["path"] | Literal["tags"] | Literal["quality_profile"] | Literal["add"]
+        Literal["path"]
+        | Literal["tags"]
+        | Literal["quality"]
+        | Literal["language"]
+        | Literal["add"]
     ]
 
 
@@ -47,9 +50,10 @@ class Sonarr(ExtArrService, ArrService):
         self.arr_variant = ArrVariants.SONARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
+        self.language_profiles = self.get_language_profiles()
 
     @keyboard
-    def keyboard(self, state: State):
+    def keyboard(self, state: State, allow_edit=None):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
 
@@ -69,6 +73,12 @@ class Sonarr(ExtArrService, ArrService):
                 [
                     Button(
                         f"Change Path   ({state.root_folder.get('path', '-')})",
+                        self.get_clbk("path", state.index),
+                    )
+                ],
+                [
+                    Button(
+                        f"Change Language   ({state.language_profile.get('name', '-')})",
                         self.get_clbk("path", state.index),
                     )
                 ],
@@ -126,6 +136,17 @@ class Sonarr(ExtArrService, ArrService):
                 ]
                 for p in self.quality_profiles
             ]
+        elif state.menu == "language":
+            row_navigation = [Button("=== Selecting Language Profile ===")]
+            rows_menu = [
+                [
+                    Button(
+                        p.get("name", "-"),
+                        self.get_clbk("selectlanguage", p.get("id")),
+                    )
+                ]
+                for p in self.quality_profiles
+            ]
         else:
             if in_library:
                 monitored = item.get("monitored", True)
@@ -165,20 +186,21 @@ class Sonarr(ExtArrService, ArrService):
 
         rows_action = []
         if in_library:
-            if state.menu != "add":
-                rows_action.append(
-                    [
-                        Button(f"🗑 Remove", self.get_clbk("remove")),
-                        Button(f"✏️ Edit", self.get_clbk("addmenu")),
-                    ]
-                )
-            else:
-                rows_action.append(
-                    [
-                        Button(f"🗑 Remove", self.get_clbk("remove")),
-                        Button(f"✅ Submit", self.get_clbk("add")),
-                    ]
-                )
+            if allow_edit:
+                if state.menu != "add":
+                    rows_action.append(
+                        [
+                            Button(f"🗑 Remove", self.get_clbk("remove")),
+                            Button(f"✏️ Edit", self.get_clbk("addmenu")),
+                        ]
+                    )
+                else:
+                    rows_action.append(
+                        [
+                            Button(f"🗑 Remove", self.get_clbk("remove")),
+                            Button(f"✅ Submit", self.get_clbk("add")),
+                        ]
+                    )
         else:
             if not state.menu:
                 rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
@@ -192,7 +214,7 @@ class Sonarr(ExtArrService, ArrService):
 
         return [row_navigation, *rows_menu, *rows_action]
 
-    def create_message(self, state: State, full_redraw=False):
+    def create_message(self, state: State, full_redraw=False, allow_edit=False):
         if not state.items:
             return Response(
                 caption="No series found",
@@ -201,7 +223,7 @@ class Sonarr(ExtArrService, ArrService):
 
         item = state.items[state.index]
 
-        keyboard_markup = self.keyboard(state)
+        keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         reply_message = f"{item['title']} "
         if item["year"] and str(item["year"]) not in item["title"]:
@@ -223,7 +245,7 @@ class Sonarr(ExtArrService, ArrService):
     @repaint
     @command(default=True)
     @sessionState(init=True)
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER.value)
     async def cmd_default(self, update, context, args):
         title = " ".join(args)
 
@@ -231,14 +253,30 @@ class Sonarr(ExtArrService, ArrService):
         state = State(
             items=items,
             index=0,
-            root_folder=find_first(
-                self.root_folders,
-                lambda x: items[0].get("folderName").startswith(x.get("path")),
-            ) if items else None,
-            quality_profile=find_first(
-                self.quality_profiles,
-                lambda x: items[0].get("qualityProfileId") == x.get("id"),
-            ) if items else None,
+            root_folder=(
+                find_first(
+                    self.root_folders,
+                    lambda x: items[0].get("folderName").startswith(x.get("path")),
+                )
+                if items
+                else None
+            ),
+            quality_profile=(
+                find_first(
+                    self.quality_profiles,
+                    lambda x: items[0].get("qualityProfileId") == x.get("id"),
+                )
+                if items
+                else None
+            ),
+            language_profile=(
+                find_first(
+                    self.language_profiles,
+                    lambda x: items[0].get("languageProfileId") == x.get("id"),
+                )
+                if items
+                else None
+            ),
             tags=items[0].get("tags", []) if items else None,
             menu=None,
         )
@@ -247,17 +285,19 @@ class Sonarr(ExtArrService, ArrService):
             default_session_state_key_fn(self, update), state
         )
 
-        return self.create_message(state, full_redraw=True)
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
     @repaint
     @command(cmds=["queue"])
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER.value)
     async def cmd_queue(self, update, context, args):
         return await ExtArrService.cmd_queue(self, update, context, args)
 
     @repaint
     @callback(cmds=["queue"])
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER.value)
     async def clbk_queue(self, update, context, args):
         return await ExtArrService.clbk_queue(self, update, context, args)
 
@@ -272,12 +312,29 @@ class Sonarr(ExtArrService, ArrService):
             "selectpath",
             "quality",
             "selectquality",
+            "language",
+            "selectlanguage",
             "addmenu",
         ]
     )
     @sessionState()
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_update(self, update, context, args, state):
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        # Prevent any changes from being made if in library and permission level below MOD
+        if args[0] in [
+            "addtag",
+            "remtag",
+            "selectpath",
+            "selectquality",
+            "selectlanguage",
+        ]:
+            item = state.items[state.index]
+            if "id" in item and item["id"] and not allow_edit:
+                    # Don't do anything, illegal operation
+                    return self.create_message(state, allow_edit=False)
+
         full_redraw = False
         if args[0] == "goto":
             if len(args) > 1:
@@ -300,19 +357,7 @@ class Sonarr(ExtArrService, ArrService):
                 full_redraw = True
             else:
                 state = replace(state, menu=None)
-        elif args[0] == "addmenu":
-            state = replace(state, menu="add")
-
-        return self.create_message(
-            state,
-            full_redraw=full_redraw,
-        )
-
-    @callback(cmds=["tags", "addtag", "remtag", "path", "selectpath", "quality", "selectquality"])
-    @sessionState()
-    @authorized(min_auth_level=2)
-    async def subclbk_update(self, update, context, args, state):
-        if args[0] == "tags":
+        elif args[0] == "tags":
             state = replace(state, tags=[], menu="tags")
         elif args[0] == "addtag":
             state = replace(state, tags=[*state.tags, args[1]])
@@ -328,28 +373,48 @@ class Sonarr(ExtArrService, ArrService):
         elif args[0] == "selectquality":
             quality_profile = self.get_quality_profile(args[1])
             state = replace(state, quality_profile=quality_profile, menu="add")
+        elif args[0] == "language":
+            state = replace(state, menu="language")
+        elif args[0] == "selectlanguage":
+            language_profile = self.get_language_profile(args[1])
+            state = replace(state, language_profile=language_profile, menu="add")
+        elif args[0] == "addmenu":
+            state = replace(state, menu="add")
 
         return self.create_message(
             state,
-            full_redraw=False,
+            full_redraw=full_redraw,
+            allow_edit=allow_edit
         )
 
     @clear
-    @callback(cmds=["add", "remove", "cancel"])
+    @callback(cmds=["add"])
     @sessionState(clear=True)
-    @authorized(min_auth_level=1)
-    async def subclbk_add(self, update, context, args, state):
-        if args[0] == "add":
-            self.add(
-                item=state.items[state.index],
-                quality_profile_id=state.quality_profile.get("id", 0),
-                root_folder_path=state.root_folder.get("path", ""),
-                tags=state.tags,
-            )
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def clbk_add(self, update, context, args, state):
+        result = self.add(
+            item=state.items[state.index],
+            quality_profile_id=state.quality_profile.get("id", 0),
+            language_profile_id=state.language_profile.get("id", 0),
+            root_folder_path=state.root_folder.get("path", ""),
+            tags=state.tags,
+        )
+        if not result:
+            return Response(caption="Seems like something went wrong...")
 
-            return Response(caption="Series added!")
-        elif args[0] == "remove":
-            self.remove(id=state.items[state.index].get("id"))
-            return Response(caption="Series removed!")
-        elif args[0] == "cancel":
-            return Response(caption="Search canceled!")
+        return Response(caption="Series added!")
+
+    @clear
+    @callback(cmds=["cancel"])
+    @sessionState(clear=True)
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def clbk_cancel(self, update, context, args, state):
+        return Response(caption="Search canceled!")
+
+    @clear
+    @callback(cmds=["remove"])
+    @sessionState(clear=True)
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def clbk_remove(self, update, context, args, state):
+        self.remove(id=state.items[state.index].get("id"))
+        return Response(caption="Series removed!")

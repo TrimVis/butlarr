@@ -10,9 +10,7 @@ from ..tg_handler.message import (
     repaint,
     clear,
 )
-from ..tg_handler.auth import (
-    authorized,
-)
+from ..tg_handler.auth import authorized, AuthLevels
 from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
@@ -222,7 +220,7 @@ class Radarr(ExtArrService, ArrService):
     @repaint
     @command(default=True)
     @sessionState(init=True)
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER)
     async def cmd_default(self, update, context, args):
         title = " ".join(args)
         items = self.lookup(title)
@@ -230,14 +228,22 @@ class Radarr(ExtArrService, ArrService):
         state = State(
             items=items,
             index=0,
-            root_folder=find_first(
-                self.root_folders,
-                lambda x: items[0].get("folderName").startswith(x.get("path")),
-            ) if items else None,
-            quality_profile=find_first(
-                self.quality_profiles,
-                lambda x: items[0].get("qualityProfileId") == x.get("id"),
-            ) if items else None,
+            root_folder=(
+                find_first(
+                    self.root_folders,
+                    lambda x: items[0].get("folderName").startswith(x.get("path")),
+                )
+                if items
+                else None
+            ),
+            quality_profile=(
+                find_first(
+                    self.quality_profiles,
+                    lambda x: items[0].get("qualityProfileId") == x.get("id"),
+                )
+                if items
+                else None
+            ),
             tags=items[0].get("tags", []) if items else None,
             menu=None,
         )
@@ -246,17 +252,19 @@ class Radarr(ExtArrService, ArrService):
             default_session_state_key_fn(self, update), state
         )
 
-        return self.create_message(state, full_redraw=True)
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
     @repaint
     @command(cmds=["queue"])
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER)
     async def cmd_queue(self, update, context, args):
         return await ExtArrService.cmd_queue(self, update, context, args)
 
     @repaint
     @callback(cmds=["queue"])
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_queue(self, update, context, args):
         return await ExtArrService.clbk_queue(self, update, context, args)
 
@@ -275,8 +283,17 @@ class Radarr(ExtArrService, ArrService):
         ]
     )
     @sessionState()
-    @authorized(min_auth_level=1)
+    @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_update(self, update, context, args, state):
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        # Prevent any changes from being made if in library and permission level below MOD
+        if args[0] in ["addtag", "remtag", "selectpath", "selectquality"]:
+            item = state.items[state.index]
+            if "id" in item and item["id"] and not allow_edit:
+                # Don't do anything, illegal operation
+                return self.create_message(state, allow_edit=False)
+
         full_redraw = False
         if args[0] == "goto":
             if len(args) > 1:
@@ -321,24 +338,36 @@ class Radarr(ExtArrService, ArrService):
         return self.create_message(
             state,
             full_redraw=full_redraw,
+            allow_edit=allow_edit
         )
 
     @clear
-    @callback(cmds=["add", "remove", "cancel"])
+    @callback(cmds=["add"])
     @sessionState(clear=True)
-    @authorized(min_auth_level=1)
-    async def btn_add(self, update, context, args, state):
-        if args[0] == "add":
-            self.add(
-                item=state.items[state.index],
-                quality_profile_id=state.quality_profile.get("id"),
-                root_folder_path=state.root_folder.get("path"),
-                tags=state.tags,
-            )
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def clbk_add(self, update, context, args, state):
+        result = self.add(
+            item=state.items[state.index],
+            quality_profile_id=state.quality_profile.get("id"),
+            root_folder_path=state.root_folder.get("path"),
+            tags=state.tags,
+        )
+        if not result:
+            return Response(caption="Seems like something went wrong...")
 
-            return Response(caption="Movie added!")
-        elif args[0] == "remove":
-            self.remove(id=state.items[state.index].get("id"))
-            return Response(caption="Movie removed!")
-        elif args[0] == "cancel":
-            return Response(caption="Search canceled!")
+        return Response(caption="Movie added!")
+
+    @clear
+    @callback(cmds=["cancel"])
+    @sessionState(clear=True)
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def clbk_cancel(self, update, context, args, state):
+        return Response(caption="Search canceled!")
+
+    @clear
+    @callback(cmds=["remove"])
+    @sessionState(clear=True)
+    @authorized(min_auth_level=AuthLevels.MOD)
+    async def clbk_remove(self, update, context, args, state):
+        self.remove(id=state.items[state.index].get("id"))
+        return Response(caption="Movie removed!")

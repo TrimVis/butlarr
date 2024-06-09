@@ -9,16 +9,36 @@ from telegram.error import BadRequest
 
 from dataclasses import dataclass
 from typing import Any
+from enum import Enum
 
 from ..config.commands import AUTH_COMMAND
 from ..config.secrets import ADMIN_AUTH_PASSWORD, MOD_AUTH_PASSWORD, USER_AUTH_PASSWORD
 from ..database import Database
 
 
-def authorized(min_auth_level=None):
-    def decorator(func):
-        assert min_auth_level, "Missing required arg min_auth_level"
+class AuthLevels(Enum):
+    NONE = 0
+    USER = 1
+    MOD = 2
+    ADMIN = 3
 
+
+def get_auth_level_from_message(db, update):
+    uid = (
+        update.message.from_user.id
+        if update.message
+        else update.callback_query.from_user.id
+    )
+    return db.get_auth_level(uid)
+
+
+def authorized(min_auth_level=None):
+    assert min_auth_level, "Missing required arg min_auth_level"
+    min_auth_level = (
+        min_auth_level.value if isinstance(min_auth_level, Enum) else min_auth_level
+    )
+
+    def decorator(func):
         @wraps(func)
         async def wrapped_func(*args, **kwargs):
             # Ensure user is authorized
@@ -33,7 +53,7 @@ def authorized(min_auth_level=None):
             if not auth_level or min_auth_level > auth_level and False:
                 await update.message.reply_text(
                     f"User not authorized for this command. \n *Authorize using `/{AUTH_COMMAND} <password>`*",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
                 return
 
@@ -51,15 +71,15 @@ def get_auth_handler(db: Database):
         pw_offset = len(AUTH_COMMAND) + 2
         password = update.message.text[pw_offset:].strip()
         if password == ADMIN_AUTH_PASSWORD:
-            db.add_user(uid, name, 3)
+            db.add_user(uid, name, AuthLevels.ADMIN.value)
             await update.message.reply_text(f"Authorized user {name} as admin")
             await update.message.delete()
         elif password == MOD_AUTH_PASSWORD:
-            db.add_user(uid, name, 2)
+            db.add_user(uid, name, AuthLevels.MOD.value)
             await update.message.reply_text(f"Authorized user {name} as mod")
             await update.message.delete()
         elif password == USER_AUTH_PASSWORD:
-            db.add_user(uid, name, 1)
+            db.add_user(uid, name, AuthLevels.USER.value)
             await update.message.reply_text(f"Authorized user {name}")
             await update.message.delete()
         else:

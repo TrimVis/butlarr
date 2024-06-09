@@ -19,6 +19,9 @@ bad_request_poster_error_messages = [
 ]
 
 no_caption_error_messages = ["There is no caption in the message to edit"]
+no_edit_error_messages = [
+    "Message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message"
+]
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,8 @@ def repaint(func):
                             reply_markup=message.reply_markup,
                             parse_mode=message.parse_mode,
                         )
+                    elif str(e) in no_edit_error_messages:
+                        pass
                     else:
                         raise e
             else:
