@@ -4,12 +4,12 @@
 
 ## Why use Butlarr
 
-*Butlarr* is a telegram bot that allows the interaction of multiple people with *arr* instances.
-It allows the addition and managment of movies, series, and more to come.
+*Butlarr* is a telegram bot that allows multiple people to interact with *arr* instances.
+It allows the addition and management of movies, series, and more.
 
-*Butlarr* has been created with hackability and base-compatibility in mind.
-If you have a service that behaves logically the same as Sonarr or Radarr it will be compatible with *Butlarr*.
-Even if it is not compatible, it is relatively simple to extend the exesting code base for various other services.
+*Butlarr* has been created with hackability and base compatibility in mind.
+If you have a service that behaves logically the same as Sonarr or Radarr, it will be compatible with *Butlarr*.
+Even if it is not compatible, it is relatively simple to extend the existing code base for various other services.
 
 ## Features
 
@@ -28,10 +28,10 @@ Change the quality profile, assign/remove tags, etc.
 
 ### Queue
 
-For sonarr and radarr there is native support to display the queue and it's download progress.
-To use it you can use the `queue` subcommand.
+For Sonarr and Radarr, there is native support to display the queue and its download progress.
+To use it, you can use the `queue` subcommand.
 
-E.g. if you configured sonarr on the `series` command, use:
+E.g., if you configured Sonarr on the `series` command, use:
 
 ```bash
 /series queue
@@ -39,8 +39,8 @@ E.g. if you configured sonarr on the `series` command, use:
 
 ## Basic Usage
 
-After following the *Setup* and *Configuration*, ensure that the bot is running.
-If not you can start it using: `python -m butlarr` from the repository directory.
+After following the *Setup* and *Configuration*, ensure the bot is running.
+If not, you can start it using: `python -m butlarr` from the repository directory.
 Open the telegram chat to the bot and authorize yourself using your previously set `AUTH_PASSWORD`:
 
 ```bash
@@ -48,7 +48,7 @@ Open the telegram chat to the bot and authorize yourself using your previously s
 ```
 
 Show a basic help page using `/help`
-To add a movie for example, you could send `/movie Alvin`
+To add a movie, for example, you could send `/movie Alvin`
 
 ![image](https://github.com/TrimVis/butlarr/assets/29759576/089bb19a-01d6-4d89-bc92-f42128200bf0)
 ![image](https://github.com/TrimVis/butlarr/assets/29759576/9bb30521-ba02-4045-9e1a-06e425d64ce7)
@@ -79,7 +79,7 @@ To add a movie for example, you could send `/movie Alvin`
     docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
     ```
 
-2. Copy over/Create a new `docker-compose.yml` file, with content:
+2. Copy over/Create a new `docker-compose.yml` file with content:
 
     ```yaml
     services:
@@ -97,10 +97,10 @@ To add a movie for example, you could send `/movie Alvin`
 
 #### Quick Local Setup
 
-> This setup currently only supports linux
+> This setup currently only supports Linux
 > If you are interested in running this on any other OS, please refer to the Docker and Docker Compose instructions
 
-1. First clone the repository and cd into it
+1. First, clone the repository and cd into it
 
     ```bash
     git clone git@github.com:TrimVis/butlarr.git && cd butlarr
@@ -112,11 +112,11 @@ To add a movie for example, you could send `/movie Alvin`
     ./scripts/start_linux.sh
     ```
 
-This will do steps 2, 3 and 5 of the Manual Setup.
+This will do steps 2, 3, and 5 of the Manual Setup.
 
 #### Manual Setup
 
-1. First clone the repository and cd into it
+1. First, clone the repository and cd into it
 
     ```bash
     git clone git@github.com:TrimVis/butlarr.git && cd butlarr
@@ -145,7 +145,7 @@ This will do steps 2, 3 and 5 of the Manual Setup.
 
 #### Automatic Configuration
 
-There is an automatic setup helper available. You can run it by executing the `./scripts/autosetup_linux.sh` file from the repository directory.
+An automatic setup helper is available. You can run it by executing the `./scripts/autosetup_linux.sh` file from the repository directory.
 
 If you are working with docker, use:
 
@@ -184,8 +184,8 @@ services:
     api: "series"
 ```
 
-There are 3 unique roles available: admin, mod and user.
-A user can only add movies, but not remove or edit existing entries.
+There are 3 unique roles available: admin, mod, and user.
+A user can only add movies but cannot remove or edit existing entries.
 A mod can do both of these.
 A admin will have all possible permissions, currently this is equivalent to the mod user.
 The `auth_passwords` should be unique, if they are not the user will always be upgraded to the highest possible role.
@@ -193,11 +193,11 @@ The `auth_passwords` should be unique, if they are not the user will always be u
 ### Systemd service
 
 Create a new file under `/etc/systemd/user` (recommended: `/etc/systemd/user/butlarr.service`)
-The new file should have following content (you have to adapt the `REPO_PATH`):
+The new file should have the following content (you have to adapt the `REPO_PATH`):
 
 ```ini
 [Unit]
-Description      = Butlarr Telegram Bot for Arr Service Managment
+Description      = Butlarr Telegram Bot for Arr Service Management
 After            = network.target
 After            = systemd-user-sessions.service
 After            = network-online.target
