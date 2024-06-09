@@ -6,7 +6,7 @@ from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
 
 from ..config.commands import AUTH_COMMAND, HELP_COMMAND
-from ..config.secrets import AUTH_PASSWORD
+from ..config.secrets import ADMIN_AUTH_PASSWORD
 from ..database import Database
 
 

@@ -10,8 +10,6 @@ from telegram.error import BadRequest
 from dataclasses import dataclass
 from typing import Any
 
-from ..config.commands import AUTH_COMMAND
-from ..config.secrets import AUTH_PASSWORD
 from ..database import Database
 
 bad_request_poster_error_messages = [

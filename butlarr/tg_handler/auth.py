@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..config.commands import AUTH_COMMAND
-from ..config.secrets import AUTH_PASSWORD
+from ..config.secrets import ADMIN_AUTH_PASSWORD, MOD_AUTH_PASSWORD, USER_AUTH_PASSWORD
 from ..database import Database
 
 
@@ -50,7 +50,15 @@ def get_auth_handler(db: Database):
         name = update.message.from_user.name
         pw_offset = len(AUTH_COMMAND) + 2
         password = update.message.text[pw_offset:].strip()
-        if password == AUTH_PASSWORD:
+        if password == ADMIN_AUTH_PASSWORD:
+            db.add_user(uid, name, 3)
+            await update.message.reply_text(f"Authorized user {name} as admin")
+            await update.message.delete()
+        elif password == MOD_AUTH_PASSWORD:
+            db.add_user(uid, name, 2)
+            await update.message.reply_text(f"Authorized user {name} as mod")
+            await update.message.delete()
+        elif password == USER_AUTH_PASSWORD:
             db.add_user(uid, name, 1)
             await update.message.reply_text(f"Authorized user {name}")
             await update.message.delete()

@@ -94,10 +94,21 @@ def service_setup(hide_done=False):
     return Service([cmd], service[0].upper() + service[1:], service, url, api_key)
 
 
-def create_config_yaml(services, telegram_token, auth_password, config_file=None):
+def create_config_yaml(
+    services,
+    telegram_token,
+    admin_auth_password,
+    mod_auth_password,
+    user_auth_password,
+    config_file=None,
+):
     config = {
         "telegram": {"token": telegram_token},
-        "auth": {"password": auth_password},
+        "auth_passwords": {
+            "admin": admin_auth_password,
+            "mod": admin_auth_password,
+            "user": admin_auth_password,
+        },
         "apis": {
             s.commands[0]: {"api_host": s.url, "api_key": s.api_key} for s in services
         },
@@ -122,7 +133,18 @@ def main():
     config_file = CONFIG_FILE_LOCATION or f"{base_path}/config.yaml"
 
     telegram_token = input("Your telegram bot token:  ")
-    auth_password = input("Your authentication password (/auth <PW>):  ")
+    print("You will now set various authentication passwords (/auth <PW>)")
+    user_auth_password = input("User role, can only add entries:  ")
+    while True:
+        mod_auth_password = input("Mod role, can add and edit entries:  ")
+        if user_auth_password != mod_auth_password:
+            break
+        print("All passwords have to be unique! Please try again.")
+    while True:
+        admin_auth_password = input("Admin role, can do anything:  ")
+        if mod_auth_password != admin_auth_password:
+            break
+        print("All passwords have to be unique! Please try again.")
 
     print("Adding new services...")
     new_services = []
@@ -139,12 +161,25 @@ def main():
         print()
 
         print(f"'{config_file}' content would have been:")
-        pprint(create_config_yaml(new_services, telegram_token, auth_password))
+        pprint(
+            create_config_yaml(
+                new_services,
+                telegram_token,
+                admin_auth_password,
+                mod_auth_password,
+                user_auth_password,
+            )
+        )
         exit(0)
 
     print(f"Creating '{config_file}'...")
     create_config_yaml(
-        new_services, telegram_token, auth_password, config_file=config_file
+        new_services,
+        telegram_token,
+        admin_auth_password,
+        mod_auth_password,
+        user_auth_password,
+        config_file=config_file,
     )
 
     print("All config files have been succesfully created. Your bot should be setup.")

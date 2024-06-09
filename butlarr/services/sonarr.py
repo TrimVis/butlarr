@@ -300,7 +300,19 @@ class Sonarr(ExtArrService, ArrService):
                 full_redraw = True
             else:
                 state = replace(state, menu=None)
-        elif args[0] == "tags":
+        elif args[0] == "addmenu":
+            state = replace(state, menu="add")
+
+        return self.create_message(
+            state,
+            full_redraw=full_redraw,
+        )
+
+    @callback(cmds=["tags", "addtag", "remtag", "path", "selectpath", "quality", "selectquality"])
+    @sessionState()
+    @authorized(min_auth_level=2)
+    async def subclbk_update(self, update, context, args, state):
+        if args[0] == "tags":
             state = replace(state, tags=[], menu="tags")
         elif args[0] == "addtag":
             state = replace(state, tags=[*state.tags, args[1]])
@@ -316,19 +328,17 @@ class Sonarr(ExtArrService, ArrService):
         elif args[0] == "selectquality":
             quality_profile = self.get_quality_profile(args[1])
             state = replace(state, quality_profile=quality_profile, menu="add")
-        elif args[0] == "addmenu":
-            state = replace(state, menu="add")
 
         return self.create_message(
             state,
-            full_redraw=full_redraw,
+            full_redraw=False,
         )
 
     @clear
     @callback(cmds=["add", "remove", "cancel"])
     @sessionState(clear=True)
     @authorized(min_auth_level=1)
-    async def btn_add(self, update, context, args, state):
+    async def subclbk_add(self, update, context, args, state):
         if args[0] == "add":
             self.add(
                 item=state.items[state.index],
