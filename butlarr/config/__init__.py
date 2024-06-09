@@ -1,4 +1,5 @@
 import yaml
+import os
 
 # Import config
 CONFIG_FILE = os.getenv("BUTLARR_CONFIG_FILE") or "config.yaml"
