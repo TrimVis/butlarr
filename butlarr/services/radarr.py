@@ -174,14 +174,21 @@ class Radarr(ExtArrService, ArrService):
                     rows_action.append(
                         [
                             Button(f"🗑 Remove", self.get_clbk("remove")),
-                            Button(f"✅ Submit", self.get_clbk("add")),
+                            Button(f"✅ Submit", self.get_clbk("add", "no-search")),
                         ]
                     )
         else:
             if not state.menu:
                 rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
             elif state.menu == "add":
-                rows_action.append([Button(f"✅ Submit", self.get_clbk("add"))])
+                rows_action.append(
+                    [
+                        Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                        Button(
+                            f"✅+🔍 Submit & Search", self.get_clbk("add", "search")
+                        ),
+                    ]
+                )
 
         if state.menu:
             rows_action.append([Button("🔙 Back", self.get_clbk("goto"))])
@@ -337,9 +344,7 @@ class Radarr(ExtArrService, ArrService):
             state = replace(state, menu="add")
 
         return self.create_message(
-            state,
-            full_redraw=full_redraw,
-            allow_edit=allow_edit
+            state, full_redraw=full_redraw, allow_edit=allow_edit
         )
 
     @clear
@@ -352,6 +357,7 @@ class Radarr(ExtArrService, ArrService):
             quality_profile_id=state.quality_profile.get("id"),
             root_folder_path=state.root_folder.get("path"),
             tags=state.tags,
+            options={"addOptions": {"searchForMovie": args[1] == "search"}},
         )
         if not result:
             return Response(caption="Seems like something went wrong...")
