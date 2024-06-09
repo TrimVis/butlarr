@@ -163,8 +163,10 @@ Paste and adapt the following template `templates/config.yaml`:
 telegram: 
   token: "<YOUR_TELEGRAM_TOKEN>"
 
-auth:
-  password: "<SECURE_PASSWORD>"
+auth_passwords:
+  admin: "<SECURE_UNIQUE_PASSWORD>"
+  mod: "<SECURE_UNIQUE_PASSWORD>"
+  user: "<SECURE_UNIQUE_PASSWORD>"
 
 apis:
   movie:
