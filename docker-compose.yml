@@ -9,5 +9,4 @@ services:
       - BUTLARR_CONFIG_FILE=./config.yaml
       - BUTLARR_INTERACTIVE_SETUP=false
     restart: unless-stopped
-    network_mode: host
 

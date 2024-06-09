@@ -93,7 +93,6 @@ To add a movie for example, you could send `/movie Alvin`
             - BUTLARR_CONFIG_FILE=./config.yaml
             - BUTLARR_INTERACTIVE_SETUP=false
             restart: unless-stopped
-            network_mode: host
     ```
 
 #### Quick Local Setup
