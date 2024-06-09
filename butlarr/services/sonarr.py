@@ -193,6 +193,12 @@ class Sonarr(ExtArrService, ArrService):
         return [row_navigation, *rows_menu, *rows_action]
 
     def create_message(self, state: State, full_redraw=False):
+        if not state.items:
+            return Response(
+                caption="No series found",
+                state=state,
+            )
+
         item = state.items[state.index]
 
         keyboard_markup = self.keyboard(state)
@@ -228,12 +234,12 @@ class Sonarr(ExtArrService, ArrService):
             root_folder=find_first(
                 self.root_folders,
                 lambda x: items[0].get("folderName").startswith(x.get("path")),
-            ),
+            ) if items else None,
             quality_profile=find_first(
                 self.quality_profiles,
                 lambda x: items[0].get("qualityProfileId") == x.get("id"),
-            ),
-            tags=items[0].get("tags", []),
+            ) if items else None,
+            tags=items[0].get("tags", []) if items else None,
             menu=None,
         )
 
