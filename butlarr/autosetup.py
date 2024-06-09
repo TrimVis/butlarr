@@ -24,12 +24,15 @@ class Service:
 
 
 def detect_base_path():
-    n = 0
+    found = False
     cdir = "."
-    for n in range(10):
+    for _ in range(10):
         if ".git" in os.listdir(cdir):
+            found = True
             break
         cdir = f"../{cdir}"
+    if not found:
+        return "."
     return cdir.removesuffix("/.")
 
 
@@ -111,7 +114,7 @@ def create_config_yaml(services, telegram_token, auth_password, config_file=None
     if config_file:
         with open(config_file, "w+") as f:
             yaml.safe_dump(config, f)
-    return config
+    return yaml.safe_dump(config)
 
 
 def main():

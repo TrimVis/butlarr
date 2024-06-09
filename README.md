@@ -57,7 +57,49 @@ To add a movie for example, you could send `/movie Alvin`
 
 ### Setup
 
-#### Quick Setup
+#### Docker
+
+1. Configure butlarr (see *Configuration* for manual configuration)
+
+    ```bash
+    docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
+    ```
+
+2. Run the container
+
+    ```bash
+    docker run trimforce/butlarr:latest
+    ```
+
+#### Docker Compose
+
+1. Configure butlarr (see *Configuration* for manual configuration)
+
+    ```bash
+    docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
+    ```
+
+2. Copy over/Create a new `docker-compose.yml` file, with content:
+
+    ```yaml
+    services:
+        butlarr:
+            container_name: butlarr
+            image: trimforce/butlarr:latest
+            volumes:
+            - ./data:/app/data
+            - ./config.yaml:/app/config.yaml
+            environment:
+            - BUTLARR_CONFIG_FILE=./config.yaml
+            - BUTLARR_INTERACTIVE_SETUP=false
+            restart: unless-stopped
+            network_mode: host
+    ```
+
+#### Quick Local Setup
+
+> This setup currently only supports linux
+> If you are interested in running this on any other OS, please refer to the Docker and Docker Compose instructions
 
 1. First clone the repository and cd into it
 
@@ -96,15 +138,21 @@ This will do steps 2, 3 and 5 of the Manual Setup.
 4. Configure butlarr (see *Configuration*)
 5. Start the service
 
-```bash
-python -m butlarr
-```
+    ```bash
+    python -m butlarr
+    ```
 
 ### Configuration
 
 #### Automatic Configuration
 
 There is an automatic setup helper available. You can run it by executing the `./scripts/autosetup_linux.sh` file from the repository directory.
+
+If you are working with docker, use:
+
+```bash
+docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
+```
 
 #### Manual Configuration
 
@@ -169,5 +217,5 @@ Enable it to start on reboots using: `systemctl --user enable butlarr`
 
 ## Open TODOs
 
-- [ ] Create docker instructions
 - [ ] Create a pip package
+- [ ] Add more permission levels

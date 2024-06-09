@@ -1,0 +1,13 @@
+services:
+  butlarr:
+    container_name: butlarr
+    image: trimforce/butlarr:latest
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - BUTLARR_CONFIG_FILE=./config.yaml
+      - BUTLARR_INTERACTIVE_SETUP=false
+    restart: unless-stopped
+    network_mode: host
+
