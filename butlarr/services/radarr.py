@@ -47,7 +47,7 @@ class Radarr(ExtArrService, ArrService):
         self.quality_profiles = self.get_quality_profiles()
 
     @keyboard
-    def keyboard(self, state: State):
+    def keyboard(self, state: State, allow_edit=False):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
 
@@ -162,20 +162,21 @@ class Radarr(ExtArrService, ArrService):
 
         rows_action = []
         if in_library:
-            if state.menu != "add":
-                rows_action.append(
-                    [
-                        Button(f"🗑 Remove", self.get_clbk("remove")),
-                        Button(f"✏️ Edit", self.get_clbk("addmenu")),
-                    ]
-                )
-            else:
-                rows_action.append(
-                    [
-                        Button(f"🗑 Remove", self.get_clbk("remove")),
-                        Button(f"✅ Submit", self.get_clbk("add")),
-                    ]
-                )
+            if allow_edit:
+                if state.menu != "add":
+                    rows_action.append(
+                        [
+                            Button(f"🗑 Remove", self.get_clbk("remove")),
+                            Button(f"✏️ Edit", self.get_clbk("addmenu")),
+                        ]
+                    )
+                else:
+                    rows_action.append(
+                        [
+                            Button(f"🗑 Remove", self.get_clbk("remove")),
+                            Button(f"✅ Submit", self.get_clbk("add")),
+                        ]
+                    )
         else:
             if not state.menu:
                 rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
@@ -189,7 +190,7 @@ class Radarr(ExtArrService, ArrService):
 
         return [row_navigation, *rows_menu, *rows_action]
 
-    def create_message(self, state: State, full_redraw=False):
+    def create_message(self, state: State, full_redraw=False, allow_edit=False):
         if not state.items:
             return Response(
                 caption="No movies found",
@@ -198,7 +199,7 @@ class Radarr(ExtArrService, ArrService):
 
         item = state.items[state.index]
 
-        keyboard_markup = self.keyboard(state)
+        keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         reply_message = f"{item['title']} "
         if item["year"] and str(item["year"]) not in item["title"]:
