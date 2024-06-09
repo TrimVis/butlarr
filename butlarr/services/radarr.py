@@ -10,7 +10,7 @@ from ..tg_handler.message import (
     repaint,
     clear,
 )
-from ..tg_handler.auth import authorized, AuthLevels
+from ..tg_handler.auth import authorized, AuthLevels, get_auth_level_from_message
 from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,

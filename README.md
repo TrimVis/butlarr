@@ -185,6 +185,12 @@ services:
     api: "series"
 ```
 
+There are 3 unique roles available: admin, mod and user.
+A user can only add movies, but not remove or edit existing entries.
+A mod can do both of these.
+A admin will have all possible permissions, currently this is equivalent to the mod user.
+The `auth_passwords` should be unique, if they are not the user will always be upgraded to the highest possible role.
+
 ### Systemd service
 
 Create a new file under `/etc/systemd/user` (recommended: `/etc/systemd/user/butlarr.service`)
