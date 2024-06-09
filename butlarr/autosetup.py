@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import List
+from pprint import pprint
 import re
 import os
+import yaml
 
 SERVICES = [
     "done",
@@ -87,52 +89,29 @@ def service_setup(hide_done=False):
     return Service([cmd], service[0].upper() + service[1:], service, url, api_key)
 
 
-def create_services_py(services, write_out=True, base_path="."):
-    imports = "\n".join(
-        [f"from ..services.{s.class_file} import {s.class_name}" for s in services]
-    )
-    services = "\n".join(
-        [
-            f"""{s.class_name}(
-        commands=["{s.commands[0]}"],
-        api_host=APIS.get("{s.commands[0]}")[0],
-        api_key=APIS.get("{s.commands[0]}")[1],
-    ),"""
-            for s in services
-        ]
-    )
-    content = f"""from .secrets import APIS
-
-{imports}
-
-SERVICES = [
-    {services}
-]
-"""
-
-    if write_out:
-        with open(f"{base_path}/butlarr/config/services.py", "w+") as f:
-            f.writelines(content)
-    return content
-
-
-def create_secrets_py(
-    telegram_token, auth_password, services, write_out=True, base_path="."
+def create_config_yaml(
+    services, telegram_token, auth_password, write_out=True, base_path="."
 ):
-    apis = "\n".join(
-        [f'"{s.commands[0]}": ("{s.url}", "{s.api_key}"),' for s in services]
-    )
-    content = f"""TELEGRAM_TOKEN = \"{telegram_token}\"
-AUTH_PASSWORD = \"{auth_password}\"
+    config = {
+        "telegram": {"token": telegram_token},
+        "auth": {"password": auth_password},
+        "apis": {
+            s.commands[0]: {"api_host": s.url, "api_key": s.api_key} for s in services
+        },
+        "services": [
+            {
+                "type": s.class_name,
+                "commands": s.commands,
+                "api": s.commands[0],
+            }
+            for s in services
+        ],
+    }
 
-APIS = {{
-    {apis}
-}}
-"""
     if write_out:
-        with open(f"{base_path}/butlarr/config/secrets.py", "w+") as f:
-            f.writelines(content)
-    return content
+        with open(f"{base_path}/config.yaml", "w+") as f:
+            yaml.safe_dump(config, f)
+    return config
 
 
 def main():
@@ -147,35 +126,31 @@ def main():
         new_services.append(s)
 
     print(
-        "If you continue, your inputs will be written out. The current config files will be overwritten!"
+        "If you continue, your inputs will be written out. The current config file will be overwritten!"
     )
     print(
-        f"Make sure to back up {base_path}/butlarr/config/secrets.py and {base_path}/butlarr/config/services.py if you want to keep them."
+        f"Make sure to back up {base_path}/config.yaml if you want to keep them."
     )
     if input("Do you want to continue? (y/n)  ").strip().lower() != "y":
         print("Exiting setup. Did not write any config files.")
         print()
         print()
 
-        print(f"{base_path}/butlarr/config/secrets.py content would have been:")
-        print(
-            create_secrets_py(
+        print(f"'{base_path}/config.yaml' content would have been:")
+        pprint(
+            create_config_yaml(
+                new_services,
                 telegram_token,
                 auth_password,
-                new_services,
-                write_out=False,
                 base_path=base_path,
+                write_out=False,
             )
         )
-        print()
-        print(f"{base_path}/butlarr/config/services.py content would have been:")
-        print(create_services_py(new_services, write_out=False, base_path=base_path))
         exit(0)
 
-    print(f"Creating {base_path}/butlarr/config/secrets.py...")
-    create_secrets_py(telegram_token, auth_password, new_services, base_path=base_path)
-    print(f"Creating {base_path}/butlarr/config/services.py...")
-    create_services_py(new_services, base_path=base_path)
+    print(f"Creating '{base_path}/config.yaml'...")
+    create_config_yaml(new_services, telegram_token, auth_password, base_path=base_path)
+
     print("All config files have been succesfully created. Your bot should be setup.")
     print("You can start the bot by using one of the start scripts:")
     for f in os.listdir(f"{base_path}/scripts"):

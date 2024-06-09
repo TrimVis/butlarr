@@ -108,40 +108,31 @@ There is an automatic setup helper available. You can run it by executing the `.
 
 #### Manual Configuration
 
-After cloning the repository and `cd`ing into the repository, create a new file at `butlarr/config/secrets.py`.
-Paste and adapt the following template `secrets.py`:
+After cloning the repository and `cd`ing into the repository, create a new file at `config.yaml`.
+Paste and adapt the following template `templates/config.yaml`:
 
-```python
-TELEGRAM_TOKEN = "<YOUR_TELEGRAM_TOKEN>"
-AUTH_PASSWORD = "<A_SECURE_PASSWORD>"
+```yaml
+telegram: 
+  token: "<YOUR_TELEGRAM_TOKEN>"
 
-APIS = {
-    "movie": ("http://localhost:7878/", "<RADARR_API_KEY>"),
-    "series": ("http://localhost:8989/", "<SONARR_API_KEY>"),
-}
-```
+auth:
+  password: "<SECURE_PASSWORD>"
 
-You will also have to add service instances, create a new file at `butlarr/config/services.py`.
-Paste and adapt the following template `services.py`:
+apis:
+  movie:
+    api_host: "<HOST_API_0>"
+    api_key: "<API_KEY_0>"
+  series:
+    api_host: "<HOST_API_1>"
+    api_key: "<API_KEY_1>"
 
-```python
-from .secrets import APIS
-
-from ..services.radarr import Radarr 
-from ..services.sonarr import Sonarr
-
-SERVICES = [
-    Radarr(
-        commands=["movie"],
-        api_host=APIS.get("movie")[0],
-        api_key=APIS.get("movie")[1],
-    ),
-    Sonarr(
-        commands=["series"],
-        api_host=APIS.get("series")[0],
-        api_key=APIS.get("series")[1],
-    ),
-]
+services:
+  - type: "Radarr"
+    commands: ["movie"]
+    api: "movie"
+  - type: "Sonarr"
+    commands: ["series"]
+    api: "series"
 ```
 
 ### Systemd service

@@ -26,3 +26,5 @@ for service in config["services"]:
                 api_key=api_config["api_key"]
             )
         )
+    else:
+        assert False, "Unsupported service type!"

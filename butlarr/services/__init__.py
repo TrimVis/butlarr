@@ -83,9 +83,13 @@ class ArrService(TelegramHandler):
                 assert not status, "By default only v3 ArrServices are supported"
         finally:
             if status is None:
-                logger.error("Could not reach compatible api. Is the service down? Is your API key correct?")
+                logger.error(
+                    "Could not reach compatible api. Is the service down? Is your API key correct?"
+                )
                 exit(1)
-            assert status, "Could not reach compatible api. Is the service down? Is your API key correct?"
+            assert (
+                status
+            ), "Could not reach compatible api. Is the service down? Is your API key correct?"
             api_version = status.get("version", "")
             assert api_version, "Could not find compatible api."
             return api_version
