@@ -1,5 +1,6 @@
 import yaml
 
 # Import config
-with open("config.yaml", "r") as config_file:
-    config = yaml.safe_load(config_file)
+CONFIG_FILE = os.getenv("BUTLARR_CONFIG_FILE") or "config.yaml"
+with open(CONFIG_FILE, "r") as config_file:
+    CONFIG = yaml.safe_load(config_file)

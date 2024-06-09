@@ -5,6 +5,8 @@ import re
 import os
 import yaml
 
+CONFIG_FILE_LOCATION = os.getenv("BUTLARR_CONFIG_FILE")
+
 SERVICES = [
     "done",
     "sonarr",
@@ -89,9 +91,7 @@ def service_setup(hide_done=False):
     return Service([cmd], service[0].upper() + service[1:], service, url, api_key)
 
 
-def create_config_yaml(
-    services, telegram_token, auth_password, write_out=True, base_path="."
-):
+def create_config_yaml(services, telegram_token, auth_password, config_file=None):
     config = {
         "telegram": {"token": telegram_token},
         "auth": {"password": auth_password},
@@ -108,14 +108,15 @@ def create_config_yaml(
         ],
     }
 
-    if write_out:
-        with open(f"{base_path}/config.yaml", "w+") as f:
+    if config_file:
+        with open(config_file, "w+") as f:
             yaml.safe_dump(config, f)
     return config
 
 
 def main():
     base_path = detect_base_path()
+    config_file = CONFIG_FILE_LOCATION or f"{base_path}/config.yaml"
 
     telegram_token = input("Your telegram bot token:  ")
     auth_password = input("Your authentication password (/auth <PW>):  ")
@@ -128,28 +129,20 @@ def main():
     print(
         "If you continue, your inputs will be written out. The current config file will be overwritten!"
     )
-    print(
-        f"Make sure to back up {base_path}/config.yaml if you want to keep them."
-    )
+    print(f"Make sure to back up {config_file} if you want to keep them.")
     if input("Do you want to continue? (y/n)  ").strip().lower() != "y":
         print("Exiting setup. Did not write any config files.")
         print()
         print()
 
-        print(f"'{base_path}/config.yaml' content would have been:")
-        pprint(
-            create_config_yaml(
-                new_services,
-                telegram_token,
-                auth_password,
-                base_path=base_path,
-                write_out=False,
-            )
-        )
+        print(f"'{config_file}' content would have been:")
+        pprint(create_config_yaml(new_services, telegram_token, auth_password))
         exit(0)
 
-    print(f"Creating '{base_path}/config.yaml'...")
-    create_config_yaml(new_services, telegram_token, auth_password, base_path=base_path)
+    print(f"Creating '{config_file}'...")
+    create_config_yaml(
+        new_services, telegram_token, auth_password, config_file=config_file
+    )
 
     print("All config files have been succesfully created. Your bot should be setup.")
     print("You can start the bot by using one of the start scripts:")

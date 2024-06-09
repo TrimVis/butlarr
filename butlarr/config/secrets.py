@@ -1,4 +1,4 @@
-from . import config
+from . import CONFIG
 
-TELEGRAM_TOKEN = config["telegram"]["token"]
-AUTH_PASSWORD = config["auth"]["password"]
+TELEGRAM_TOKEN = CONFIG["telegram"]["token"]
+AUTH_PASSWORD = CONFIG["auth"]["password"]

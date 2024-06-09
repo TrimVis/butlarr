@@ -1,11 +1,11 @@
-from . import config
+from . import CONFIG
 from ..services.radarr import Radarr
 from ..services.sonarr import Sonarr
 
-APIS = config["apis"]
+APIS = CONFIG["apis"]
 SERVICES = []
 
-for service in config["services"]:
+for service in CONFIG["services"]:
     service_type = service["type"]
     commands = service["commands"]
     api_config = APIS[service["api"]]
