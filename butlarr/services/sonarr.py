@@ -399,15 +399,17 @@ class Sonarr(ExtArrService, ArrService):
     async def clbk_add(self, update, context, args, state):
         result = self.add(
             item=state.items[state.index],
-            quality_profile_id=state.quality_profile.get("id", 0),
-            language_profile_id=state.language_profile.get("id", 0),
-            root_folder_path=state.root_folder.get("path", ""),
-            tags=state.tags,
             options={
+                "minimumAvailability": "released",
+                "monitored": True,
+                "qualityProfileId": state.quality_profile.get("id", 0),
+                "languageProfileId": state.language_profile.get("id", 0),
+                "rootFolderPath": state.root_folder.get("path", ""),
+                "tags": state.tags,
                 "addOptions": {
                     "searchForMissingEpisodes": args[1] == "search",
                     "monitor": "all",
-                }
+                },
             },
         )
         if not result:

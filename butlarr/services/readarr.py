@@ -31,7 +31,7 @@ class State:
 
 
 @handler
-class Radarr(ExtArrService, ArrService):
+class Readarr(ExtArrService, ArrService):
     def __init__(
         self,
         commands: List[str],
@@ -41,8 +41,8 @@ class Radarr(ExtArrService, ArrService):
         self.commands = commands
         self.api_key = api_key
 
-        self.api_version = self.detect_api(api_host)
-        self.arr_variant = ArrVariants.RADARR
+        self.api_version = self.detect_api(api_host, version="v1")
+        self.arr_variant = ArrVariants.READARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
 
@@ -54,9 +54,9 @@ class Radarr(ExtArrService, ArrService):
         rows_menu = []
         if state.menu == "add":
             if in_library:
-                row_navigation = [Button("=== Editing Movie ===", "noop")]
+                row_navigation = [Button("=== Editing Book ===", "noop")]
             else:
-                row_navigation = [Button("=== Adding Movie ===", "noop")]
+                row_navigation = [Button("=== Adding Book ===", "noop")]
             rows_menu = [
                 [
                     Button(
@@ -142,15 +142,10 @@ class Radarr(ExtArrService, ArrService):
                 ),
                 (
                     Button(
-                        "TMDB",
-                        url=f"https://www.themoviedb.org/movie/{item['tmdbId']}",
+                        item["links"][0]["name"],
+                        url=item["links"][0]["url"],
                     )
-                    if item.get("tmdbId", None)
-                    else None
-                ),
-                (
-                    Button("IMDB", url=f"https://imdb.com/title/{item['imdbId']}")
-                    if item.get("imdbId", None)
+                    if len(item.get("links", []))
                     else None
                 ),
                 (
@@ -200,7 +195,7 @@ class Radarr(ExtArrService, ArrService):
     def create_message(self, state: State, full_redraw=False, allow_edit=False):
         if not state.items:
             return Response(
-                caption="No movies found",
+                caption="No books found",
                 state=state,
             )
 
@@ -209,17 +204,14 @@ class Radarr(ExtArrService, ArrService):
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
+        if item["seriesTitle"] and item["seriesTitle"] not in item["title"]:
+            reply_message += f"({item['seriesTitle']}) "
 
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
+        reply_message += f"\n\n{item.get('overview', '')}"
         reply_message = reply_message[0:1024]
 
         return Response(
-            photo=item.get("remotePoster") if full_redraw else None,
+            photo=(item.get("remoteCover", None) if full_redraw else None),
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
@@ -255,6 +247,7 @@ class Radarr(ExtArrService, ArrService):
             tags=items[0].get("tags", []) if items else None,
             menu=None,
         )
+        print(state.items[state.index])
 
         self.session_db.add_session_entry(
             default_session_state_key_fn(self, update), state
@@ -352,21 +345,38 @@ class Radarr(ExtArrService, ArrService):
     @sessionState(clear=True)
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_add(self, update, context, args, state):
+        print(state.items[state.index])
         result = self.add(
             item=state.items[state.index],
             options={
                 "minimumAvailability": "released",
                 "monitored": True,
+                "tags": state.tags,
                 "qualityProfileId": state.quality_profile.get("id"),
                 "rootFolderPath": state.quality_profile.get("id"),
-                "tags": state.tags,
-                "addOptions": {"searchForMovie": args[1] == "search"},
+                # NOTE pjordan: This probably fucks some things up
+                "author": {
+                    "value": {
+                        "tags": state.tags,
+                        "qualityProfileId": state.quality_profile.get("id"),
+                        "rootFolderPath": state.root_folder.get("path"),
+                        "monitored": True,
+                        "addOptions": {
+                            "monitored": True,
+                            "searchForMissingBooks": False,
+                        },
+                    }
+                },
+                "addOptions": {
+                    "addType": "manual",
+                    "searchForNewBook": args[1] == "search",
+                },
             },
         )
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Movie added!")
+        return Response(caption="Book added!")
 
     @clear
     @callback(cmds=["cancel"])
@@ -381,4 +391,4 @@ class Radarr(ExtArrService, ArrService):
     @authorized(min_auth_level=AuthLevels.MOD)
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
-        return Response(caption="Movie removed!")
+        return Response(caption="Book removed!")
