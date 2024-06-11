@@ -5,7 +5,7 @@ import sqlite3
 from threading import Lock
 
 DEFAULT_PATH = os.path.join(
-    Path(os.path.dirname(os.path.realpath(__file__))).parent, "data", "searcharr.db"
+    Path(os.path.dirname(os.path.realpath(__file__))).parent, "data", "db.sqlite"
 )
 
 
