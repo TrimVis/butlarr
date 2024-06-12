@@ -28,6 +28,7 @@ class ArrVariants(Enum):
     UNSUPPORTED = None
     RADARR = "movie"
     SONARR = "series"
+    READARR = "book"
 
 
 class ArrService(TelegramHandler):
@@ -71,20 +72,20 @@ class ArrService(TelegramHandler):
             return r.json()
         return r
 
-    def detect_api(self, api_host):
+    def detect_api(self, api_host, version="v3"):
         status = None
         # Detect version and api_url
         try:
-            self.api_url = f"{api_host.rstrip('/')}/api/v3"
+            self.api_url = f"{api_host.rstrip('/')}/api/{version}"
             status = self.request("system/status")
             if not status:
                 self.api_url = f"{api_host.rstrip('/')}/api"
                 status = self.request("system/status")
-                assert not status, "By default only v3 ArrServices are supported"
+                assert not status, f"By default only a {version} service is supported"
         finally:
             if status is None:
                 logger.error(
-                    "Could not reach compatible api. Is the service down? Is your API key correct?"
+                    f"Could not reach compatible api at {api_host}. Is the service down? Is your API key correct?"
                 )
                 exit(1)
             assert (
@@ -150,12 +151,6 @@ class ArrService(TelegramHandler):
         self,
         *,
         item=None,
-        root_folder_path: str = "",
-        quality_profile_id: str = "",
-        language_profile_id: str = "",
-        min_availability="released",
-        tags: List[str] = [],
-        monitored=True,
         options={},
     ):
         assert item, "Missing required arg! You need to provide a item!"
@@ -165,12 +160,6 @@ class ArrService(TelegramHandler):
             action=Action.POST,
             params={
                 **item,
-                "qualityProfileId": quality_profile_id,
-                "languageProfileId": language_profile_id,
-                "rootFolderPath": root_folder_path,
-                "tags": tags,
-                "monitored": monitored,
-                "minimumAvailability": min_availability,
                 **options,
             },
         )
