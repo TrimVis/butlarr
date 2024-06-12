@@ -24,10 +24,14 @@ class Action(Enum):
     DELETE = "delete"
 
 
-class ArrVariants(Enum):
+class ServiceContent(Enum):
+    MOVIE = "movie"
+    SERIES = "series"
+
+class ArrVariant(Enum):
     UNSUPPORTED = None
-    RADARR = "movie"
     SONARR = "series"
+    RADARR = "movie"
 
 
 class ArrService(TelegramHandler):
@@ -35,7 +39,8 @@ class ArrService(TelegramHandler):
     api_url: str
     api_key: str
     api_version: str
-    api_variant = ArrVariants.UNSUPPORTED
+    service_content: ServiceContent = None
+    arr_variant: ArrVariant | str = None
 
     root_folders: List[str] = []
     session_db: SessionDatabase = SessionDatabase()

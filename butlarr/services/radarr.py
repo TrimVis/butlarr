@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, Action, ArrVariants, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first
 from .ext import ExtArrService, QueueState
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -42,7 +42,8 @@ class Radarr(ExtArrService, ArrService):
         self.api_key = api_key
 
         self.api_version = self.detect_api(api_host)
-        self.arr_variant = ArrVariants.RADARR
+        self.service_content = ServiceContent.MOVIE
+        self.arr_variant = ArrVariant.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
 

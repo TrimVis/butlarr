@@ -1,4 +1,5 @@
 import shlex
+import inspect
 
 from typing import List, Tuple, Callable
 from loguru import logger
@@ -13,13 +14,21 @@ from ..database import Database
 def get_help_handler(services):
     response_message = f"""
     Welcome to *butlarr*! \n
-    *butlarr* is a bot that helps you interact with various **arr** services. \n
+    *butlarr* is a bot that helps you interact with various _arr_ services. \n
     To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
     After doing so you can interact with the various services using:
     """
     for s in services:
         for cmd in s.commands:
-            response_message += f"\n - `/{cmd} <search string>`"
+            response_message += f"\n - `/{cmd} <search string>` \t _Search for a {s.service_content.value}_"
+    response_message += "\n"
+
+    for s in services:
+        methods = inspect.getmembers(s, predicate=inspect.ismethod)
+        for _, m in methods:
+            if hasattr(m, "clbk_cmds") and 'queue' in m.clbk_cmds:
+                response_message += f"\n - `/{s.commands[0]} queue` \t _Shows the {type(s).__name__} download queue_"
+                break
 
     async def handler(update, context):
         await update.message.reply_text(response_message, parse_mode="Markdown")

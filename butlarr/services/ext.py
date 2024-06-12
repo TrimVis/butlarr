@@ -50,7 +50,7 @@ class ExtArrService(ArrService):
         lines = ["*Queue*", ""]
         offset = state.page * state.page_size + 1
         for idx, item in enumerate(state.items["records"]):
-            percent = 1.0 - (float(item.get("sizeleft", 0)) / item.get("size", 1))
+            percent = 1.0 - (float(item.get("sizeleft", 0)) / (item.get("size") or 1))
             progress = math.floor(percent * WIDTH)
             remaining = math.ceil((1.0 - percent) * WIDTH)
             status = item.get("status", "-")

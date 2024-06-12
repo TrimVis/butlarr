@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, Action, ArrVariants, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first
 from .ext import ExtArrService
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -47,7 +47,8 @@ class Sonarr(ExtArrService, ArrService):
         self.api_key = api_key
 
         self.api_version = self.detect_api(api_host)
-        self.arr_variant = ArrVariants.SONARR
+        self.service_content = ServiceContent.SERIES
+        self.arr_variant = ArrVariant.SONARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
