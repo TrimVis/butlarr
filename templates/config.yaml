@@ -1,0 +1,23 @@
+telegram: 
+  token: "<YOUR_TELEGRAM_TOKEN>"
+
+auth_passwords:
+  admin: "<SECURE_UNIQUE_PASSWORD>"
+  mod: "<SECURE_UNIQUE_PASSWORD>"
+  user: "<SECURE_UNIQUE_PASSWORD>"
+
+apis:
+  movie:
+    api_host: "<HOST_API_0>"
+    api_key: "<API_KEY_0>"
+  series:
+    api_host: "<HOST_API_1>"
+    api_key: "<API_KEY_1>"
+
+services:
+  - type: "Radarr"
+    commands: ["movie", "m"]
+    api: "movie"
+  - type: "Sonarr"
+    commands: ["series", "s"]
+    api: "series"
