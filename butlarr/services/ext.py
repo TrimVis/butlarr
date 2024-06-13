@@ -53,14 +53,13 @@ class ExtArrService(ArrService):
             percent = 1.0 - (float(item.get("sizeleft", 0)) / (item.get("size") or 1))
             progress = math.floor(percent * WIDTH)
             remaining = math.ceil((1.0 - percent) * WIDTH)
-            status = item.get("status", "-")
 
             title = escape_markdownv2_chars(item.get("title", "")[0 : 2 * WIDTH])
             title_ln = f"{offset + idx}\. *{title}*"
             progress_ln = (
-                f">`[{progress * '='}|{(remaining*' ')}]` {(percent*100):.0f}%"
+                f">`[{progress * '='}|{(remaining*' ')}]` {round(percent*100)}%"
             )
-            status_ln = f">Status: _{item.get('status', 'N/A')}_ \(_{item.get('trackedDownloadState', '-')}_\)   Time left: _{item.get('timeleft', 'N/A')}_"
+            status_ln = f">Status: _{escape_markdownv2_chars(item.get('status', 'N/A'))}_ \(_{escape_markdownv2_chars(item.get('trackedDownloadState', '-'))}_\)   Time left: _{escape_markdownv2_chars(item.get('timeleft', 'N/A'))}_"
 
             lines += [title_ln, progress_ln, status_ln]
 
