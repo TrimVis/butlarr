@@ -115,28 +115,3 @@ def repaint(func):
                     await update.callback_query.message.delete()
 
     return wrapped_func
-
-
-def escape_markdownv2_chars(text: str):
-    for c in [
-        "_",
-        "*",
-        "[",
-        "]",
-        "(",
-        ")",
-        "~",
-        "`",
-        ">",
-        "#",
-        "+",
-        "-",
-        "=",
-        "|",
-        "{",
-        "}",
-        ".",
-        "!",
-    ]:
-        text = text.replace(c, f"\{c}")
-    return text

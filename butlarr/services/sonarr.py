@@ -251,10 +251,17 @@ class Sonarr(ExtArrService, ArrService):
         )
 
     @repaint
-    @command(default=True)
+    @command(
+        default=True,
+        default_pattern="<title>",
+        default_description="Search for a series",
+        cmds=[("search", "<title>", "Search for a series")],
+    )
     @sessionState(init=True)
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def cmd_default(self, update, context, args):
+        if len(args) > 1 and args[0] == "search":
+            args = args[1:]
         title = " ".join(args)
 
         items = self.lookup(title)
@@ -297,8 +304,12 @@ class Sonarr(ExtArrService, ArrService):
         allow_edit = auth_level >= AuthLevels.MOD.value
         return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
+    @command(cmds=[("help", "", "Shows only the sonarr help page")])
+    async def cmd_help(self, update, context, args):
+        return await ExtArrService.cmd_help(self, update, context, args)
+
     @repaint
-    @command(cmds=["queue"])
+    @command(cmds=[("queue", "", "Shows the sonarr download queue")])
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def cmd_queue(self, update, context, args):
         return await ExtArrService.cmd_queue(self, update, context, args)
