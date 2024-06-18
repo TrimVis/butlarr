@@ -1,34 +1,13 @@
-name: Release and Deploy
+name: Deploy Resources after Release
 
 on:
   release:
     types: [created]
 
 jobs:
-  update_release:
-    name: Attach Files to Release and Update Description
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Zip repository contents
-        run: zip -r release.zip .
-
-      - name: Upload release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./release.zip
-          asset_name: release.zip
-          asset_content_type: application/zip
-
   build_and_push_docker:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    needs: update_release
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
