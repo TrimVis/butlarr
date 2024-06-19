@@ -54,6 +54,9 @@ def repaint(func):
     async def wrapped_func(self, update, context, *args, **kwargs):
         message = await func(self, update, context, *args, **kwargs)
 
+        if not message:
+            return
+
         if not message.photo:
             if update.callback_query:
                 await update.callback_query.answer()
