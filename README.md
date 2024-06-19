@@ -71,6 +71,11 @@ To add a movie, for example, you could send `/movie Alvin`
     docker run trimforce/butlarr:latest
     ```
 
+You can also use map your own configuration file into the container by running the command below instead of 2:
+```
+docker run -v ./config.yaml:/app/config.yaml  trimforce/butlarr:latest 
+```
+
 #### Docker Compose
 
 1. Configure butlarr (see *Configuration* for manual configuration)
