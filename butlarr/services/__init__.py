@@ -89,7 +89,7 @@ class ArrService(TelegramHandler):
         finally:
             if status is None:
                 logger.error(
-                    "Could not reach compatible api. Is the service down? Is your API key correct?"
+                    f"Could not reach compatible api. Is the service ({self.api_url}) down? Is your API key correct?"
                 )
                 exit(1)
             assert (

@@ -5,6 +5,7 @@ from typing import List, Tuple, Callable
 from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
+from typing import TypeAlias
 
 from ..config.commands import AUTH_COMMAND, HELP_COMMAND
 from ..config.secrets import ADMIN_AUTH_PASSWORD
@@ -35,10 +36,10 @@ def escape_markdownv2_chars(text: str):
     return text
 
 
-type CmdStr = str  # The command itself
-type CmdPattern = str  # Help text: Descriptive pattern for arguments
-type CmdDescription = str  # Help text: Description of command
-type Cmd = CmdStr | Tuple[CmdStr, CmdPattern, CmdDescription]
+CmdStr: TypeAlias = str  # The command itself
+CmdPattern: TypeAlias = str  # Help text: Descriptive pattern for arguments
+CmdDescription: TypeAlias = str  # Help text: Description of command
+Cmd: TypeAlias = CmdStr | Tuple[CmdStr, CmdPattern, CmdDescription]
 
 
 
