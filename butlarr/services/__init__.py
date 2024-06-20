@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from loguru import logger
 from enum import Enum
 from typing import List, Tuple, Optional, Any
+from gzip import decompress
 import requests
 from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
@@ -28,6 +29,7 @@ class ArrVariants(Enum):
     UNSUPPORTED = None
     RADARR = "movie"
     SONARR = "series"
+    BAZARR = "subtitles"
 
 
 class ArrService(TelegramHandler):
@@ -68,7 +70,13 @@ class ArrService(TelegramHandler):
             return fallback
 
         if action != Action.DELETE:
-            return r.json()
+            json = r.json()
+
+            if json:
+                return json
+            else:
+                return r
+                
         return r
 
     def detect_api(self, api_host):
