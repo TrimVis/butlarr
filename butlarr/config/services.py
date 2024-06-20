@@ -10,14 +10,22 @@ for service in CONFIG["services"]:
     commands = service["commands"]
     api_config = APIS[service["api"]]
 
+    subtitles = service.get("subtitles")
+    if subtitles:
+        subtitles["api"] = APIS[subtitles["api"]]
+        
     if service_type == "Radarr":
-        SERVICES.append(
-            Radarr(
-                commands=commands,
-                api_host=api_config["api_host"],
-                api_key=api_config["api_key"]
-            )
-        )
+        radarr = Radarr(
+                    commands=commands,
+                    api_host=api_config["api_host"],
+                    api_key=api_config["api_key"],
+                    subtitles=subtitles
+                )
+                
+        SERVICES.append(radarr)
+        if subtitles:
+            SERVICES.append(radarr.subtitles)
+            
     elif service_type == "Sonarr":
         SERVICES.append(
             Sonarr(
