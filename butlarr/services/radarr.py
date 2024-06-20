@@ -17,6 +17,8 @@ from ..tg_handler.session_state import (
 )
 from ..tg_handler.keyboard import Button, keyboard
 
+from .bazarr import Bazarr
+
 
 @dataclass(frozen=True)
 class State:
@@ -37,6 +39,7 @@ class Radarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
+        subtitles: ArrService = None
     ):
         self.commands = commands
         self.api_key = api_key
@@ -45,6 +48,9 @@ class Radarr(ExtArrService, ArrService):
         self.arr_variant = ArrVariants.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
+        
+        if subtitles:
+            self.subtitles = self.subtitles_integration(subtitles)
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
@@ -77,6 +83,14 @@ class Radarr(ExtArrService, ArrService):
                 #     ),
                 # ],
             ]
+
+            if in_library and self.subtitles:
+                rows_menu.append([
+                    Button(
+                        f"Get Subtitles",
+                        self.subtitles.get_clbk("list", state.index, item.get("id"), 'radarr'),
+                    ),
+                ])
 
         elif state.menu == "tags":
             row_navigation = [Button("=== Selecting Tags ===")]
@@ -378,3 +392,15 @@ class Radarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Movie removed!")
+    
+    def subtitles_integration(self, subtitles):
+        if subtitles["type"] == "Bazarr":
+            return Bazarr(
+                    commands=["subtitles"],
+                    api_host=subtitles["api"]["api_host"], 
+                    api_key=subtitles["api"]["api_key"]
+                )
+        else:
+            assert False, "Unsupported subtitles service type!"
+            return False
+        
