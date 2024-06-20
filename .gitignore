@@ -6,3 +6,4 @@ backups/
 config.yaml
 dist/
 pyproject.toml
+.vscode/
