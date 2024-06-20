@@ -41,6 +41,7 @@ class Bazarr(ExtArrService, ArrService):
         self.api_key = api_key
         
         self.api_version = self.detect_api(api_host)
+        self.service_content = ServiceContent.SUBTITLES
         self.arr_variant = ArrVariants.BAZARR
     
     @keyboard
@@ -192,7 +193,6 @@ class Bazarr(ExtArrService, ArrService):
             state, full_redraw=full_redraw, allow_edit=allow_edit
         )
 
-    # @clear
     @repaint
     @command(default=True)
     @sessionState(init=True)

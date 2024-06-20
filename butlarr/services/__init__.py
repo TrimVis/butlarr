@@ -28,6 +28,7 @@ class Action(Enum):
 class ServiceContent(Enum):
     MOVIE = "movie"
     SERIES = "series"
+    SUBTITLES = "subtitles"
 
 
 class ArrVariant(Enum):
