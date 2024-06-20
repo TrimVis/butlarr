@@ -1,25 +1,63 @@
 import shlex
+import inspect
 
 from typing import List, Tuple, Callable
 from loguru import logger
 from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
+from typing import TypeAlias
 
 from ..config.commands import AUTH_COMMAND, HELP_COMMAND
 from ..config.secrets import ADMIN_AUTH_PASSWORD
 from ..database import Database
 
 
+def escape_markdownv2_chars(text: str):
+    for c in [
+        "_",
+        "*",
+        "[",
+        "]",
+        "(",
+        ")",
+        "~",
+        "`",
+        "#",
+        "+",
+        "-",
+        "=",
+        "|",
+        "{",
+        "}",
+        ".",
+        "!",
+    ]:
+        text = text.replace(c, rf"\{c}")
+    return text
+
+
+CmdStr: TypeAlias = str  # The command itself
+CmdPattern: TypeAlias = str  # Help text: Descriptive pattern for arguments
+CmdDescription: TypeAlias = str  # Help text: Description of command
+Cmd: TypeAlias = CmdStr | Tuple[CmdStr, CmdPattern, CmdDescription]
+
+
+
 def get_help_handler(services):
     response_message = f"""
-    Welcome to *butlarr*! \n
-    *butlarr* is a bot that helps you interact with various **arr** services. \n
-    To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
-    After doing so you can interact with the various services using:
+Welcome to *butlarr*! \n
+*butlarr* is a bot that helps you interact with various _arr_ services. \n
+To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
+After doing so you can interact with the various services using:
     """
     for s in services:
         for cmd in s.commands:
-            response_message += f"\n - `/{cmd} <search string>`"
+            response_message += f"\n - `/{cmd} {escape_markdownv2_chars(s.default_pattern)}` \t _{escape_markdownv2_chars(s.default_description)}_"
+    response_message += "\n"
+
+    for s in services:
+        for cmd, pattern, desc, _ in s.sub_commands:
+            response_message += f"\n - `/{s.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
 
     async def handler(update, context):
         await update.message.reply_text(response_message, parse_mode="Markdown")
@@ -42,7 +80,10 @@ def get_clbk_handler(services):
     return CallbackQueryHandler(handler)
 
 
-def callback(cmds=[], default=False):
+def callback(
+    cmds: List[str] = [],
+    default: bool = False,
+):
     def decorator(func):
         if default:
             func.clbk_default = True
@@ -53,12 +94,23 @@ def callback(cmds=[], default=False):
     return decorator
 
 
-def command(cmds=[], default=False):
+def command(
+    cmds: List[Cmd] = [],
+    default: bool = False,
+    default_description: CmdDescription = "",
+    default_pattern: CmdPattern = "",
+):
     def decorator(func):
         if default:
-            func.cmd_default = True
+            func.cmd_default = (default_description, default_pattern)
         if cmds:
-            func.cmd_cmds = cmds
+            if isinstance(cmds[0], tuple):
+                assert (
+                    len(cmds[0]) == 3
+                ), "CmdTuple needs to contain pattern as well as description"
+                func.cmd_cmds = cmds
+            else:
+                func.cmd_cmds = [(cmd, "", "") for cmd in cmds]
         return func
 
     return decorator
@@ -67,28 +119,39 @@ def command(cmds=[], default=False):
 def handler(cls):
     cls.sub_commands = []
     cls.sub_callbacks = []
-    default_command = None
-    default_callback = None
-    for method in cls.__dict__.values():
+    cls.default_command = None
+    cls.default_callback = None
+    cls.default_description = ""
+    cls.default_pattern = ""
+    has_default_command = False
+    has_default_callback = False
+
+    for method in list(cls.__dict__.values()):
         if hasattr(method, "cmd_cmds"):
-            cls.sub_commands += [(cmd, method) for cmd in method.cmd_cmds]
+            cls.sub_commands += [
+                (cmd, pattern, desc, method) for (cmd, pattern, desc) in method.cmd_cmds
+            ]
         if hasattr(method, "cmd_default"):
-            assert default_command is None, "Only one default command allowed."
-            default_command = method
+            assert not has_default_command, f"Only one default command allowed."
+            cls.default_command = method
+            (desc, pattern) = method.cmd_default
+            cls.default_description = desc
+            cls.default_pattern = pattern
+            has_default_command = True
         if hasattr(method, "clbk_cmds"):
             cls.sub_callbacks += [(cmd, method) for cmd in method.clbk_cmds]
         if hasattr(method, "clbk_default"):
-            assert default_callback is None, "Only one default callback allowed."
-            default_callback = method
-    cls.default_command = default_command
-    cls.default_callback = default_callback
+            assert not has_default_callback, "Only one default callback allowed."
+            cls.default_callback = method
+            has_default_callback = True
+
     return cls
 
 
 class TelegramHandler:
     db: Database
-    commands: List[str]
-    sub_commands: List[Tuple[str, Callable]]
+    commands: List[CmdStr]
+    sub_commands: List[Tuple[CmdStr, CmdPattern, CmdDescription, Callable]]
     sub_callbacks: List[Tuple[str, Callable]]
 
     def register(self, application, db):
@@ -105,7 +168,7 @@ class TelegramHandler:
         logger.info(f"Received command: {args}")
 
         if self.sub_commands and len(args) > 1:
-            for s, c in self.sub_commands:
+            for s, _, _, c in self.sub_commands:
                 if args[1] == s:
                     logger.debug(f"Subcommand - Executing {s} ({c.__name__})")
                     await c(self, update, context, args[1:])

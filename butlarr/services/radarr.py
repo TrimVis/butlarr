@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, Action, ArrVariants, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first
 from .ext import ExtArrService, QueueState
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -45,7 +45,8 @@ class Radarr(ExtArrService, ArrService):
         self.api_key = api_key
 
         self.api_version = self.detect_api(api_host)
-        self.arr_variant = ArrVariants.RADARR
+        self.service_content = ServiceContent.MOVIE
+        self.arr_variant = ArrVariant.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         
@@ -240,10 +241,17 @@ class Radarr(ExtArrService, ArrService):
         )
 
     @repaint
-    @command(default=True)
+    @command(
+        default=True,
+        default_pattern="<title>",
+        default_description="Search for a movie",
+        cmds=[("search", "<title>", "Search for a series")],
+    )
     @sessionState(init=True)
     @authorized(min_auth_level=AuthLevels.USER)
     async def cmd_default(self, update, context, args):
+        if len(args) > 1 and args[0] == "search":
+            args = args[1:]
         title = " ".join(args)
         items = self.lookup(title)
 
@@ -278,8 +286,12 @@ class Radarr(ExtArrService, ArrService):
         allow_edit = auth_level >= AuthLevels.MOD.value
         return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
+    @command(cmds=[("help", "", "Shows only the radarr help page")])
+    async def cmd_help(self, update, context, args):
+        return await ExtArrService.cmd_help(self, update, context, args)
+
     @repaint
-    @command(cmds=["queue"])
+    @command(cmds=[("queue", "", "Shows the radarr download queue")])
     @authorized(min_auth_level=AuthLevels.USER)
     async def cmd_queue(self, update, context, args):
         return await ExtArrService.cmd_queue(self, update, context, args)

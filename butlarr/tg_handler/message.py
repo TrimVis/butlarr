@@ -54,6 +54,9 @@ def repaint(func):
     async def wrapped_func(self, update, context, *args, **kwargs):
         message = await func(self, update, context, *args, **kwargs)
 
+        if not message:
+            return
+
         if not message.photo:
             if update.callback_query:
                 await update.callback_query.answer()
@@ -64,13 +67,19 @@ def repaint(func):
                         parse_mode=message.parse_mode,
                     )
                 except BadRequest as e:
-                    if str(e) in no_caption_error_messages:
-                        await update.callback_query.edit_message_text(
-                            message.caption,
-                            reply_markup=message.reply_markup,
-                            parse_mode=message.parse_mode,
-                        )
-                    elif str(e) in no_edit_error_messages:
+                    if e.message in no_caption_error_messages:
+                        try:
+                            await update.callback_query.edit_message_text(
+                                message.caption,
+                                reply_markup=message.reply_markup,
+                                parse_mode=message.parse_mode,
+                            )
+                        except BadRequest as e2:
+                            if e.message in no_edit_error_messages:
+                                pass
+                            else:
+                                raise e2
+                    elif e.message in no_edit_error_messages:
                         pass
                     else:
                         raise e
@@ -115,28 +124,3 @@ def repaint(func):
                     await update.callback_query.message.delete()
 
     return wrapped_func
-
-
-def escape_markdownv2_chars(text: str):
-    for c in [
-        "_",
-        "*",
-        "[",
-        "]",
-        "(",
-        ")",
-        "~",
-        "`",
-        ">",
-        "#",
-        "+",
-        "-",
-        "=",
-        "|",
-        "{",
-        "}",
-        ".",
-        "!",
-    ]:
-        text = text.replace(c, f"\{c}")
-    return text
