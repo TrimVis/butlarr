@@ -72,11 +72,6 @@ class ArrService(TelegramHandler):
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
 
-        print(endpoint)
-        print(params)
-        print(r)
-        print(r.content)
-
         if not r:
             return fallback
 
