@@ -21,6 +21,7 @@ def find_first(elems, check, fallback=0):
 class Action(Enum):
     GET = "get"
     POST = "post"
+    PUT = "put"
     DELETE = "delete"
 
 
@@ -49,6 +50,11 @@ class ArrService(TelegramHandler):
         return requests.post(
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
         )
+    
+    def _put(self, endpoint, params={}):
+        return requests.put(
+            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
+        )
 
     def _get(self, endpoint, params={}):
         return requests.get(
@@ -66,8 +72,15 @@ class ArrService(TelegramHandler):
             r = self._get(endpoint, params)
         elif action == Action.POST:
             r = self._post(endpoint, params)
+        elif action == Action.PUT:
+            r = self._put(endpoint, params)
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
+
+        print(endpoint)
+        print(params)
+        print(r)
+        print(r.content)
 
         if not r:
             return fallback
@@ -165,9 +178,17 @@ class ArrService(TelegramHandler):
     ):
         assert item, "Missing required arg! You need to provide a item!"
 
+        item_id = item.get('id')
+        if item_id:
+            action = Action.PUT
+            endpoint = f'{self.arr_variant.value}/{item_id}'
+        else:
+            action = Action.POST
+            endpoint = self.arr_variant.value
+
         return self.request(
-            self.arr_variant.value,
-            action=Action.POST,
+            endpoint,
+            action=action,
             params={
                 **item,
                 "qualityProfileId": quality_profile_id,
