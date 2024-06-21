@@ -198,7 +198,7 @@ class Sonarr(ExtArrService, ArrService):
                     rows_action.append(
                         [
                             Button(f"🗑 Remove", self.get_clbk("remove")),
-                            Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                            Button(f"🔍 Search", self.get_clbk("add", "search")),
                         ]
                     )
         else:
@@ -413,7 +413,8 @@ class Sonarr(ExtArrService, ArrService):
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Series added!")
+        return Response(caption="Series updated!" if state.items[state.index].get("id") 
+                                    else "Series added!")
 
     @clear
     @callback(cmds=["cancel"])
