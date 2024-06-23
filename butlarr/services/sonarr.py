@@ -42,6 +42,8 @@ class Sonarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
+        name: str = None,
+        addons: List[ArrService] = []
     ):
         self.commands = commands
         self.api_key = api_key
@@ -52,6 +54,10 @@ class Sonarr(ExtArrService, ArrService):
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
+
+        self.name = name
+        self.supported_addons = []
+        self.addons = addons
 
     @keyboard
     def keyboard(self, state: State, allow_edit=None):
@@ -184,6 +190,10 @@ class Sonarr(ExtArrService, ArrService):
                     else Button()
                 ),
             ]
+        
+        for addon in self.addons:
+            addon_buttons = addon.addon_buttons(state=state, service=self)
+            rows_menu.append(addon_buttons)
 
         rows_action = []
         if in_library:
