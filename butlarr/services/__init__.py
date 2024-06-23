@@ -64,7 +64,7 @@ class ArrService(TelegramHandler):
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
         )
 
-    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None):
+    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None, raw=False):
         r = None
         if action == Action.GET:
             r = self._get(endpoint, params)
@@ -72,18 +72,15 @@ class ArrService(TelegramHandler):
             r = self._post(endpoint, params)
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
+        
+        if raw:
+            return r
 
         if not r:
             return fallback
 
         if action != Action.DELETE:
-            json = r.json()
-
-            if json:
-                return json
-            else:
-                return r
-                
+            return r.json()
         return r
 
     def detect_api(self, api_host):
