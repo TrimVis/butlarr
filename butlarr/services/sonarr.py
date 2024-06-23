@@ -190,6 +190,10 @@ class Sonarr(ExtArrService, ArrService):
                     else Button()
                 ),
             ]
+        
+        for addon in self.addons:
+            addon_buttons = addon.addon_buttons(state=state, service=self)
+            rows_menu.append(addon_buttons)
 
         rows_action = []
         if in_library:
