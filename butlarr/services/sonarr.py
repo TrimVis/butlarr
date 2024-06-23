@@ -199,7 +199,12 @@ class Sonarr(ExtArrService, ArrService):
                     rows_action.append(
                         [
                             Button(f"🗑 Remove", self.get_clbk("remove")),
-                            Button(f"🔍 Search", self.get_clbk("add", "search")),
+                            Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                        ]
+                    )
+                    rows_action.append(
+                        [
+                            Button(f"✅ + 🔍 Submit & Search", self.get_clbk("add", "search")),
                         ]
                     )
         else:
