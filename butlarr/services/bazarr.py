@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, Action, ArrVariants, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first
 from .ext import ExtArrService, QueueState
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -23,10 +23,10 @@ class State:
     items: List[Any]
     index: int
     media_id: int
-    service: str
     menu: Optional[
         Literal["list"] | Literal["addsub"]
     ]
+    service: ArrService = None
 
 
 @handler
@@ -36,19 +36,31 @@ class Bazarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
+        name: str = None,
+        addons: List[ArrService] = []
     ):
         self.commands = commands
         self.api_key = api_key
         
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.SUBTITLES
-        self.arr_variant = ArrVariants.BAZARR
+        self.arr_variant = ArrVariant.BAZARR
+
+        self.name = name
+        self.supported_addons = []
+        self.addons = addons
+
+        self.current_service = None
+        
     
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
 
         rows_menu = []
-        row_navigation = [Button("=== Subtitles ===", "noop")]
+        if len(state.items) > 0:
+            row_navigation = [Button("=== Subtitles ===", "noop")]
+        else:
+            row_navigation = [Button("=== No subtitles found ===", "noop")]
 
         current_index = 0
         for item in state.items:
@@ -67,9 +79,12 @@ class Bazarr(ExtArrService, ArrService):
             if current_index >= 5: break
 
         rows_action = []
-        # todo: add back button to return to radarr state (how??)
-        rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
-
+        if state.menu and state.service:
+            rows_action.append([Button("🔙 Back", state.service.get_clbk("addmenu"))])
+        elif state.menu:
+            rows_action.append([Button("🔙 Back", state.service.get_clbk("goto"))])
+        else:
+            rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
 
         return [row_navigation, *rows_menu, *rows_action]
 
@@ -94,13 +109,13 @@ class Bazarr(ExtArrService, ArrService):
             return api_version
     
     
-    def lookup(self, service, id):
-        if service == 'radarr':
+    def lookup(self, arrvariant, id):
+        if arrvariant == ArrVariant.RADARR:
             status = self.request('providers/movies', params={'radarrid': id}, fallback=[])
-            return status.get('data') if status.get('data') else status
+            return status.get('data') if len(status) > 0 else status
         else:
             logger.error(
-                f"Bazarr integration with service {service} is Not Implemented"
+                f"Bazarr integration not Implemented"
             )
             
 
@@ -128,7 +143,8 @@ class Bazarr(ExtArrService, ArrService):
             return self.request(
                 'providers/movies',
                 action=Action.POST,
-                params=params
+                params=params,
+                raw=True
             )
         else:
             logger.error(
@@ -138,8 +154,11 @@ class Bazarr(ExtArrService, ArrService):
     
     def create_message(self, state: State, full_redraw=False, allow_edit=False):
         if not state.items:
+            keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
+
             return Response(
-                caption="No subtitles found",
+                caption='',
+                reply_markup=keyboard_markup,
                 state=state,
             )
 
@@ -148,7 +167,6 @@ class Bazarr(ExtArrService, ArrService):
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         return Response(
-            photo=None,
             caption='',
             reply_markup=keyboard_markup,
             state=state,
@@ -200,16 +218,21 @@ class Bazarr(ExtArrService, ArrService):
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_list(self, update, context, args):
         print(args)
-        media_id = args[2]
-        arrservice = 'radarr'
+        media_id = args[1]
 
-        items = self.lookup(service=arrservice, id=media_id)
+        service = self.current_service
+        if service:
+            arrvariant = service.arr_variant
+        else:
+            arrvariant = args[2]
+
+        items = self.lookup(arrvariant=arrvariant, id=media_id)
 
         state = State(
             items=items,
             index=0,
             media_id=media_id,
-            service=arrservice,
+            service=service,
             menu="list",
         )
 
@@ -221,28 +244,46 @@ class Bazarr(ExtArrService, ArrService):
         allow_edit = auth_level >= AuthLevels.USER.value
         return self.create_message(state, full_redraw=False, allow_edit=allow_edit)
 
-    @clear
     @callback(cmds=["addsub"])
     @sessionState(clear=True)
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_add(self, update, context, args, state):
+        if state.service:
+            arrvariant = state.service.arr_variant
+        else:
+            arrvariant = args[1]
+
         result = self.add(
             id = state.media_id,
-            service='radarr',
+            service=arrvariant,
             item=state.items[state.index]
         )
 
         if result.status_code < 200 \
            or result.status_code > 299:
-            return Response(caption="Seems like something went wrong...")
+            return Response(caption=f"Something went wrong... {result.content}")
 
         return Response(caption="Subtitle added!")
 
-    @clear
     @callback(cmds=["cancel"])
     @sessionState(clear=True)
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_cancel(self, update, context, args, state):
         return Response(caption="Subtitle Search canceled!")
+    
+    def addon_buttons(self, state, service): 
+        item = state.items[state.index]
+        downloaded = True if "movieFile" in item else False
 
-
+        # can't pass Service object as *args to get_clbk
+        self.current_service = service
+        
+        buttons = []
+        if state.menu == "add" and downloaded:
+            buttons.append(
+                Button(
+                    f"Subtitles",
+                    self.get_clbk("list", item.get("id"))
+                ),
+            )
+        return buttons
