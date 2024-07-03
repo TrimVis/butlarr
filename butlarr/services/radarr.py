@@ -37,7 +37,9 @@ class Radarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-    ):
+        name: str = None,
+        addons: List[ArrService] = []
+    ): 
         self.commands = commands
         self.api_key = api_key
 
@@ -46,6 +48,11 @@ class Radarr(ExtArrService, ArrService):
         self.arr_variant = ArrVariant.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
+        
+        self.name = name
+        self.supported_addons = [ArrVariant.BAZARR]
+        self.addons = addons
+
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
@@ -160,6 +167,10 @@ class Radarr(ExtArrService, ArrService):
                     else Button()
                 ),
             ]
+        
+        for addon in self.addons:
+            addon_buttons = addon.addon_buttons(sstate=state, return_to_menu="addmenu", service=self)
+            rows_menu.append(addon_buttons)
 
         rows_action = []
         if in_library:
@@ -396,3 +407,5 @@ class Radarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Movie removed!")
+
+        
