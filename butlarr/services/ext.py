@@ -1,8 +1,10 @@
 import math
+from loguru import logger
 from typing import Dict, Any
+from functools import wraps
 from dataclasses import dataclass
 
-from . import ArrService
+from . import ArrService, ArrVariant
 from ..config.queue import WIDTH, PAGE_SIZE
 
 from ..tg_handler import command, callback, handler, escape_markdownv2_chars
@@ -112,3 +114,50 @@ Following commands are available:
             response_message += f"\n - `/{self.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
 
         return await update.message.reply_text(response_message, parse_mode="Markdown")
+    
+    def load_addons(self):
+        from ..config.services import SERVICES
+        logger.info(f"Loading {self.name} addons")
+        addons = []
+        for addon in self.addons:
+            for addon_service in SERVICES:
+                if addon_service.name == addon.get("service_name"):
+                    if addon_service.arr_variant in self.supported_addons:
+                        addons.append(addon_service)
+                        logger.info(f"Addon {addon_service.name} loaded")
+                    else:
+                        assert False, f"Unsupported addon service type {addon.get('type')}!"
+                        return False
+        self.addons = addons
+        logger.debug(f"{self.name} service loaded Addons: {str(self.addons)}")
+    
+
+@dataclass(frozen=True)
+class AddonState:
+    service: ArrService
+    sstate: any
+    return_to_menu: str
+
+class Addon:
+    current_service: ArrService = None
+    current_service_state: any = None 
+    return_to_menu: str = None
+
+    # Set the service and state that is loading this addon
+    def setAddon(func):
+        @wraps(func)
+        def wrapped_func(self, *args, **kwargs):
+            self.current_service = kwargs.get('service')
+            logger.debug(f'[Addon] Current service set: {self.current_service}')
+            self.current_service_state = kwargs.get('sstate')
+            logger.debug(f'[Addon] Current service state set: {self.current_service_state.index}')
+            self.return_to_menu = kwargs.get('return_to_menu')
+            logger.debug(f'[Addon] Return menu set: {self.return_to_menu}')
+            return func(self, *args, **kwargs)
+
+        return wrapped_func
+    
+
+    @setAddon
+    def addon_buttons(self, state, **kwargs): 
+        raise NotImplementedError
