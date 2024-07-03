@@ -80,7 +80,7 @@ class Sonarr(ExtArrService, ArrService):
                 [
                     Button(
                         f"Change Language   ({state.language_profile.get('name', '-')})",
-                        self.get_clbk("path", state.index),
+                        self.get_clbk("language", state.index),
                     )
                 ],
                 #      [
@@ -146,7 +146,7 @@ class Sonarr(ExtArrService, ArrService):
                         self.get_clbk("selectlanguage", p.get("id")),
                     )
                 ]
-                for p in self.quality_profiles
+                for p in self.language_profiles
             ]
         else:
             if in_library:
@@ -200,6 +200,11 @@ class Sonarr(ExtArrService, ArrService):
                         [
                             Button(f"🗑 Remove", self.get_clbk("remove")),
                             Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                        ]
+                    )
+                    rows_action.append(
+                        [
+                            Button(f"✅ + 🔍 Submit & Search", self.get_clbk("add", "search")),
                         ]
                     )
         else:
@@ -425,7 +430,8 @@ class Sonarr(ExtArrService, ArrService):
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Series added!")
+        return Response(caption="Series updated!" if state.items[state.index].get("id") 
+                                    else "Series added!")
 
     @clear
     @callback(cmds=["cancel"])

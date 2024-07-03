@@ -178,6 +178,11 @@ class Radarr(ExtArrService, ArrService):
                             Button(f"✅ Submit", self.get_clbk("add", "no-search")),
                         ]
                     )
+                    rows_action.append(
+                        [
+                            Button(f"✅ + 🔍 Submit & Search", self.get_clbk("add", "search")),
+                        ]
+                    )
         else:
             if not state.menu:
                 rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
@@ -374,7 +379,8 @@ class Radarr(ExtArrService, ArrService):
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Movie added!")
+        return Response(caption="Movie updated!" if state.items[state.index].get("id")
+                                    else "Movie added!")
 
     @clear
     @callback(cmds=["cancel"])
