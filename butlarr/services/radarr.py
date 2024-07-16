@@ -169,7 +169,7 @@ class Radarr(ExtArrService, ArrService):
             ]
         
         for addon in self.addons:
-            addon_buttons = addon.addon_buttons(sstate=state, return_to_menu="addmenu", service=self)
+            addon_buttons = addon.addon_buttons(parent_state=state, parent_menu="addmenu", parent_service=self)
             rows_menu.append(addon_buttons)
 
         rows_action = []
