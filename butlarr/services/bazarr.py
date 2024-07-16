@@ -234,13 +234,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
             return Response(caption=f"Something went wrong... {result.content}")
         
         return self.create_message(state, full_redraw=False)
-
-
-    @callback(cmds=["cancel"])
-    @sessionState(clear=True)
-    @authorized(min_auth_level=AuthLevels.USER)
-    async def clbk_cancel(self, update, context, args, state):
-        return Response(caption="Subtitle Search canceled!")
     
     @Addon.config
     def addon_buttons(self, state=None, **kwargs):
