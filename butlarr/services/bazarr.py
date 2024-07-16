@@ -19,15 +19,16 @@ from ..tg_handler.keyboard import Button, keyboard
 
 
 @dataclass(frozen=True)
-class State(AddonState):
+class State():
     items: List[Any]
     index: int
-    arrvariant: ArrVariant
+    arr_variant: ArrVariant
     media_id: int
     subtitle: str
     menu: Optional[
         Literal["list"] | Literal["download"]
     ]
+    addon_state: Optional[AddonState]
 
 
 @handler
@@ -58,6 +59,8 @@ class Bazarr(ExtArrService, ArrService, Addon):
         row_navigation = []
         rows_menu = []
         rows_action = []
+        parent_service = state.addon_state.parent_service
+        parent_menu = state.addon_state.parent_menu
         
         if state.menu == 'list':
             if len(state.items) > 0:
@@ -83,12 +86,8 @@ class Bazarr(ExtArrService, ArrService, Addon):
         
         if state.menu == 'success':
             row_navigation = [Button("Subtitle downloaded!", "noop")]
-        if state.sstate.menu:
-            rows_action.append([Button("🔙 Go Back", state.service.get_clbk(state.return_to_menu))])
-        elif state.menu:
-            rows_action.append([Button("🔙 Back", self.get_clbk("goto"))])
-        else:
-            rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
+        if parent_menu:
+            rows_action.append([Button("🔙 Go Back", parent_service.get_clbk(parent_menu))])
 
         return [row_navigation, *rows_menu, *rows_action]
 
@@ -113,14 +112,12 @@ class Bazarr(ExtArrService, ArrService, Addon):
             return api_version
     
     
-    def search(self, arrvariant, id):
-        if arrvariant == ArrVariant.RADARR:
+    def search(self, arr_variant, id):
+        if arr_variant == ArrVariant.RADARR:
             status = self.request('providers/movies', params={'radarrid': id}, fallback=[])
             return status.get('data') if len(status) > 0 else status
         else:
             assert False, f"Bazarr integration not Implemented"
-
-            
 
     def download(
         self,
@@ -176,92 +173,32 @@ class Bazarr(ExtArrService, ArrService, Addon):
             state=state,
         )
 
-
-    @repaint
-    @callback(
-        cmds=[
-            "goto"
-            "list"
-            "download"
-        ]
-    )
-    @sessionState()
-    @authorized(min_auth_level=AuthLevels.USER)
-    async def clbk_update(self, update, context, args, state):
-
-        logger.error("clbk_update")
-
-        auth_level = get_auth_level_from_message(self.db, update)
-        allow_edit = auth_level >= AuthLevels.MOD.value
-        # Prevent any changes from being made if in library and permission level below MOD
-        if args[0] in ["download"]:
-            item = state.items[state.index]
-            if "id" in item and item["id"] and not allow_edit:
-                # Don't do anything, illegal operation
-                return self.create_message(state, allow_edit=False)
-
-        full_redraw = False
-        if args[0] == "goto":
-            if len(args) > 1:
-                idx = int(args[1])
-                item = state.items[idx]
-                state = replace(
-                    state,
-                    index=idx,
-                    menu=None,
-                )
-                full_redraw = True
-            else:
-                state = replace(state, menu=None)
-
-        if args[0] == "download":
-            if len(args) > 1:
-                idx = int(args[1])
-                item = state.items[idx]
-                state = replace(
-                    state,
-                    index=idx,
-                    subtitle=item.get('release_info')[0],
-                    menu="download",
-                )
-                full_redraw = True
-            else:
-                state = replace(state, menu="download")
-
-        if args[0] == "list":
-            state = replace(
-                    state,
-                    index=0,
-                    menu="success",
-                )
-        return self.create_message(
-            state, full_redraw=full_redraw, allow_edit=allow_edit
-        )
-
-    
-    @repaint
     @command(default=True)
+    @command(cmds=[("help", "", "Shows only the bazarr help page")])
+    async def cmd_help(self, update, context, args):
+        return await ExtArrService.cmd_help(self, update, context, args)
+
+    @repaint
     @sessionState(init=True)
     @callback(cmds=["list"])
     @authorized(min_auth_level=AuthLevels.USER)
-    async def clbk_list(self, update, context, args):
+    @Addon.load
+    async def clbk_list(self, update, context, args, **kwargs):
 
         media_id = args[1]
-        arrvariant = self.current_service.arr_variant
-        sstate = self.current_service_state
+        arr_variant = self.parent_service.arr_variant
+        parent_state = self.parent_state
         
-        items = self.search(arrvariant=arrvariant, id=media_id)  
+        items = self.search(arr_variant=arr_variant, id=media_id)  
 
         state = State(
             items=items,
             index=0,
-            arrvariant=arrvariant,
+            arr_variant=arr_variant,
             media_id=media_id,
             subtitle='',
             menu="list",
-            service=self.current_service,
-            sstate=self.current_service_state,
-            return_to_menu=self.return_to_menu
+            addon_state=kwargs.get('addon_state')
         )
 
         self.session_db.add_session_entry(
@@ -278,7 +215,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_add(self, update, context, args, state):
 
-        logger.debug(f"Return to menu {state.return_to_menu}")
+        logger.debug(f"Return to menu {state.addon_state.parent_state.menu}")
 
         state = replace(
                     state,
@@ -288,7 +225,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
         result = self.download(
             id = state.media_id,
-            service=state.arrvariant,
+            service=state.arr_variant,
             item=state.items[state.index]
         )
 
@@ -305,15 +242,15 @@ class Bazarr(ExtArrService, ArrService, Addon):
     async def clbk_cancel(self, update, context, args, state):
         return Response(caption="Subtitle Search canceled!")
     
-    @Addon.setAddon
+    @Addon.config
     def addon_buttons(self, state=None, **kwargs):
-        sstate = kwargs.get('sstate')
-        item = sstate.items[sstate.index]
+        parent_state = self.parent_state
+        item = parent_state.items[parent_state.index]
         downloaded = True if "movieFile" in item else False
         subtitle = f"({state.subtitle})" if state else ''
 
         buttons = []
-        if sstate.menu == "add" and downloaded:
+        if parent_state.menu == "add" and downloaded:
             buttons.append(
                 Button(
                     f"Subtitles {subtitle}",
