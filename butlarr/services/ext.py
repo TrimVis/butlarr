@@ -134,30 +134,43 @@ Following commands are available:
 
 @dataclass(frozen=True)
 class AddonState:
-    service: ArrService
-    sstate: any
-    return_to_menu: str
+    parent_service: ArrService = None
+    parent_state: any = None
+    parent_menu: str = None
 
 class Addon:
-    current_service: ArrService = None
-    current_service_state: any = None 
-    return_to_menu: str = None
+    parent_service: ArrService = None
+    parent_state: any = None 
+    parent_menu: str = None
 
     # Set the service and state that is loading this addon
-    def setAddon(func):
+    def config(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
-            self.current_service = kwargs.get('service')
-            logger.debug(f'[Addon] Current service set: {self.current_service}')
-            self.current_service_state = kwargs.get('sstate')
-            logger.debug(f'[Addon] Current service state set: {self.current_service_state.index}')
-            self.return_to_menu = kwargs.get('return_to_menu')
-            logger.debug(f'[Addon] Return menu set: {self.return_to_menu}')
+            self.parent_service = kwargs.get('parent_service')
+            logger.debug(f'[Addon] Current service set: {self.parent_service}')
+            self.parent_state = kwargs.get('parent_state')
+            logger.debug(f'[Addon] Current service state set: {self.parent_state.index}')
+            self.parent_menu = kwargs.get('parent_menu')
+            logger.debug(f'[Addon] Return menu set: {self.parent_menu}')
             return func(self, *args, **kwargs)
 
         return wrapped_func
     
+    def load(func):
+        @wraps(func)
+        def wrapped_func(self, *args, **kwargs):
+            addon_state = {
+                'addon_state': AddonState(
+                    parent_service=self.parent_service,
+                    parent_state=self.parent_state,
+                    parent_menu=self.parent_menu
+                )
+            }
+            return func(self, *args, **kwargs, **addon_state)
+        return wrapped_func
+    
 
-    @setAddon
+    @config
     def addon_buttons(self, state, **kwargs): 
         raise NotImplementedError
