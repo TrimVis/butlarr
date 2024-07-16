@@ -56,7 +56,7 @@ class Sonarr(ExtArrService, ArrService):
         self.language_profiles = self.get_language_profiles()
 
         self.name = name
-        self.supported_addons = []
+        self.supported_addons = [ArrVariant.BAZARR]
         self.addons = addons
 
     @keyboard
@@ -192,7 +192,7 @@ class Sonarr(ExtArrService, ArrService):
             ]
         
         for addon in self.addons:
-            addon_buttons = addon.addon_buttons(state=state, service=self)
+            addon_buttons = addon.addon_buttons(parent_state=state, parent_menu="addmenu", parent_service=self)
             rows_menu.append(addon_buttons)
 
         rows_action = []
