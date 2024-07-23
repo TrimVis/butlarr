@@ -15,8 +15,7 @@ from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
 )
-from ..tg_handler.keyboard import Button, keyboard
-
+from ..tg_handler.keyboard import Button, keyboard as keyboard
 
 @dataclass(frozen=True)
 class State:
@@ -153,6 +152,18 @@ class Sonarr(ExtArrService, ArrService):
                     )
                 ]
                 for p in self.language_profiles
+            ]
+        elif state.menu == "seasons":
+            row_navigation = [Button("=== Seasons ===")]
+            print(self.get_seasons(item["id"]))
+            rows_menu = [
+                [
+                    Button(
+                        f'Season {p.get("seasonNumber", "-")} ({p.get("statistics").get("episodeFileCount", "0")} / {p.get("statistics").get("episodeCount")})',
+                        self.get_clbk("episodes", p.get("seasonNumber", "0")),
+                    )
+                ]
+                for p in self.get_seasons(item["id"])
             ]
         else:
             if in_library:
@@ -354,6 +365,7 @@ class Sonarr(ExtArrService, ArrService):
     @sessionState()
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_update(self, update, context, args, state):
+        print(args)
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
         # Prevent any changes from being made if in library and permission level below MOD
@@ -414,6 +426,8 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
+        elif args[0] == "seasons":
+            state = replace(state, menu="seasons")
 
         return self.create_message(
             state, full_redraw=full_redraw, allow_edit=allow_edit
@@ -457,3 +471,38 @@ class Sonarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Series removed!")
+    
+    @repaint
+    @callback(cmds=["seasons"])
+    @sessionState()
+    @authorized(min_auth_level=AuthLevels.USER.value)
+    async def clbk_seasons(self, update, context, args, state):
+        state = replace(state, menu="seasons")
+
+        if not state.items:
+            return Response(
+                caption="No series found",
+                state=state,
+            )
+
+        item = state.items[state.index]
+
+        keyboard_markup = self.keyboard(state, allow_edit=False)
+        
+        return Response(
+            caption='',
+            reply_markup=keyboard_markup,
+            state=state,
+        )
+
+    def get_seasons(self, seriesId) -> List[str]:
+        series = self.request(f'series/{seriesId}', fallback=[])
+
+        if len(series) > 0:
+            return series.get('seasons')
+        else:
+            return series
+    
+    def get_episodes(self, seriesId, seasonNumber) -> List[str]:
+        params = {'seriesId': seriesId, 'seasonNumber': seasonNumber}
+        return self.request('episode', params=params, fallback=[])

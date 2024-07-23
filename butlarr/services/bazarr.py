@@ -24,7 +24,6 @@ class State():
     index: int
     arr_variant: ArrVariant
     media_id: int
-    subtitle: str
     menu: Optional[
         Literal["list"] | Literal["download"]
     ]
@@ -116,6 +115,9 @@ class Bazarr(ExtArrService, ArrService, Addon):
         if arr_variant == ArrVariant.RADARR:
             status = self.request('providers/movies', params={'radarrid': id}, fallback=[])
             return status.get('data') if len(status) > 0 else status
+        if arr_variant == ArrVariant.SONARR:
+            status = self.request('providers/episodes', params={'episodeid': id}, fallback=[])
+            return status.get('data') if len(status) > 0 else status
         else:
             assert False, f"Bazarr integration not Implemented"
 
@@ -196,7 +198,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
             index=0,
             arr_variant=arr_variant,
             media_id=media_id,
-            subtitle='',
             menu="list",
             addon_state=kwargs.get('addon_state')
         )
@@ -239,15 +240,30 @@ class Bazarr(ExtArrService, ArrService, Addon):
     def addon_buttons(self, state=None, **kwargs):
         parent_state = self.parent_state
         item = parent_state.items[parent_state.index]
-        downloaded = True if "movieFile" in item else False
-        subtitle = f"({state.subtitle})" if state else ''
+
+        if ArrVariant(self.parent_service.arr_variant) == ArrVariant.RADARR:
+            downloaded = True if "movieFile" in item else False
+            list_episodes = False
+        else:
+            downloaded = True
+            list_episodes = True
 
         buttons = []
-        if parent_state.menu == "add" and downloaded:
+
+        if parent_state.menu == "add" and downloaded and not list_episodes:
             buttons.append(
                 Button(
-                    f"Subtitles {subtitle}",
+                    f"Search for movie subtitles",
                     self.get_clbk("list", item.get("id"))
                 ),
             )
+
+        if parent_state.menu == "add" and downloaded and list_episodes:
+            buttons.append(
+                Button(
+                    f"Search for series subtitles",
+                    self.parent_service.get_clbk("seasons")
+                ),
+            )
+        
         return buttons
