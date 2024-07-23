@@ -253,15 +253,15 @@ class Bazarr(ExtArrService, ArrService, Addon):
         if parent_state.menu == "add" and downloaded and not list_episodes:
             buttons.append(
                 Button(
-                    f"Search for movie subtitles",
+                    f"Search for subtitles",
                     self.get_clbk("list", item.get("id"))
                 ),
             )
 
-        if parent_state.menu == "add" and downloaded and list_episodes:
+        if parent_state.menu == "episode" and downloaded and list_episodes:
             buttons.append(
                 Button(
-                    f"Search for series subtitles",
+                    f"Search for subtitles",
                     self.parent_service.get_clbk("seasons")
                 ),
             )

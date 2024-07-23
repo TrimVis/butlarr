@@ -88,6 +88,12 @@ class Sonarr(ExtArrService, ArrService):
                         self.get_clbk("language", state.index),
                     )
                 ],
+                [
+                    Button(
+                        f"View Seasons",
+                        self.get_clbk("seasons", state.index),
+                    )
+                ],
                 #      [
                 #          Button(
                 #              f"Change Tags   (Total: {len(state.tags)})",
@@ -155,7 +161,6 @@ class Sonarr(ExtArrService, ArrService):
             ]
         elif state.menu == "seasons":
             row_navigation = [Button("=== Seasons ===")]
-            print(self.get_seasons(item["id"]))
             rows_menu = [
                 [
                     Button(
@@ -165,6 +170,20 @@ class Sonarr(ExtArrService, ArrService):
                 ]
                 for p in self.get_seasons(item["id"])
             ]
+        elif state.menu == "episodes":
+            row_navigation = [Button(f"=== Episodes (Season {1}) ===")]
+            rows_menu = [
+                [
+                    Button(
+                        f'Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")}',
+                        self.get_clbk("selectSeasonEpisode", p.get("seasonNumber", "0"), p.get("episodeNumber", "0")),
+                    )
+                ]
+                for p in self.get_episodes(item["id"], 1)
+            ]
+        elif state.menu == "episode":
+            #row_navigation = [Button(f'=== Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")} ===')]
+            row_navigation = [Button('=== Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")} ===')]
         else:
             if in_library:
                 monitored = item.get("monitored", True)
@@ -360,12 +379,12 @@ class Sonarr(ExtArrService, ArrService):
             "language",
             "selectlanguage",
             "addmenu",
+            "selectSeasonEpisode",
         ]
     )
     @sessionState()
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_update(self, update, context, args, state):
-        print(args)
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
         # Prevent any changes from being made if in library and permission level below MOD
@@ -426,8 +445,9 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
-        elif args[0] == "seasons":
-            state = replace(state, menu="seasons")
+        elif args[0] == "selectSeasonEpisode":
+            state = replace(state, menu="episode")
+
 
         return self.create_message(
             state, full_redraw=full_redraw, allow_edit=allow_edit
@@ -473,17 +493,48 @@ class Sonarr(ExtArrService, ArrService):
         return Response(caption="Series removed!")
     
     @repaint
-    @callback(cmds=["seasons"])
+    @callback(cmds=["seasons", "episodes"])
     @sessionState()
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def clbk_seasons(self, update, context, args, state):
-        state = replace(state, menu="seasons")
+
+        if args[0] == "seasons":
+            state = replace(state, menu="seasons")
+        elif args[0] == "episodes":
+            state = replace(state, menu="episodes")
+            seasonNumber = args[1]
 
         if not state.items:
             return Response(
                 caption="No series found",
                 state=state,
             )
+
+        item = state.items[state.index]
+
+        keyboard_markup = self.keyboard(state, allow_edit=False)
+        
+        return Response(
+            caption='',
+            reply_markup=keyboard_markup,
+            state=state,
+        )
+    
+    @repaint
+    @callback(cmds=["selectSeasonEpisode"])
+    @sessionState()
+    @authorized(min_auth_level=AuthLevels.USER.value)
+    async def clbk_episode(self, update, context, args, state):
+        '''
+        items = state.items
+        print('aqui1')
+        print(state.items[state.index])
+        items[state.index]["selectedSeason"] = args[0]
+        items[state.index]["selectedEpisode"] = args[1]
+        state = replace(state, items=items)
+        print('aqui')
+        print(state.items[state.index])
+        '''
 
         item = state.items[state.index]
 
@@ -505,4 +556,5 @@ class Sonarr(ExtArrService, ArrService):
     
     def get_episodes(self, seriesId, seasonNumber) -> List[str]:
         params = {'seriesId': seriesId, 'seasonNumber': seasonNumber}
-        return self.request('episode', params=params, fallback=[])
+        episodes = self.request('episode', params=params, fallback=[])
+        return episodes
