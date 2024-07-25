@@ -132,6 +132,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
         if service == ArrVariant.RADARR:
             
+            method = 'providers/movies'
             params = {
                 "radarrid": id, 
                 "hi": item.get('hearing_impaired'), 
@@ -142,17 +143,32 @@ class Bazarr(ExtArrService, ArrService, Addon):
                 **options
             }
 
-            return self.request(
-                'providers/movies',
-                action=Action.POST,
-                params=params,
-                raw=True
-            )
+        elif service == ArrVariant.SONARR:
+            
+            method = 'providers/episodes'
+            params = {
+                "seriesid": item.get('id'),
+                "episodeid": id,
+                "hi": item.get('hearing_impaired'), 
+                "forced": item.get('forced'),
+                "original_format": item.get('original_format'),
+                "provider": item.get('provider'),
+                "subtitle": item.get('subtitle'),
+                **options
+            }
+
         else:
             logger.error(
                 f"Bazarr integration with service {service} is Not Implemented"
             )
             return False
+        
+        return self.request(
+                method,
+                action=Action.POST,
+                params=params,
+                raw=True
+            )
 
     
     def create_message(self, state: State, full_redraw=False, allow_edit=False):
@@ -241,29 +257,39 @@ class Bazarr(ExtArrService, ArrService, Addon):
         parent_state = self.parent_state
         item = parent_state.items[parent_state.index]
 
+        buttons = []
         if ArrVariant(self.parent_service.arr_variant) == ArrVariant.RADARR:
             downloaded = True if "movieFile" in item else False
-            list_episodes = False
-        else:
-            downloaded = True
-            list_episodes = True
 
-        buttons = []
+            if parent_state.menu == "add" and downloaded:
+                movieId = item.get("id")
+                
+                buttons.append(
+                    Button(
+                        f"Search for subtitles",
+                        self.get_clbk("list", movieId)
+                    ),
+                )
 
-        if parent_state.menu == "add" and downloaded and not list_episodes:
-            buttons.append(
-                Button(
-                    f"Search for subtitles",
-                    self.get_clbk("list", item.get("id"))
-                ),
-            )
+        elif ArrVariant(self.parent_service.arr_variant) == ArrVariant.SONARR:
+            downloaded = True          
 
-        if parent_state.menu == "episode" and downloaded and list_episodes:
-            buttons.append(
-                Button(
-                    f"Search for subtitles",
-                    self.parent_service.get_clbk("seasons")
-                ),
-            )
+            if parent_state.menu == "add" and downloaded:
+                buttons.append(
+                    Button(
+                        f"Seasons",
+                        self.parent_service.get_clbk("seasons")
+                    ),
+                )
+
+            elif parent_state.menu == "episode" and downloaded:
+                episodeId = item['selectedEpisodeId']
+
+                buttons.append(
+                    Button(
+                        f"Search for subtitles",
+                        self.get_clbk("list", episodeId)
+                    ),
+                )
         
         return buttons

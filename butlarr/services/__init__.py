@@ -80,6 +80,8 @@ class ArrService(TelegramHandler):
             r = self._put(endpoint, params)
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
+
+        logger.debug(r.content)
         
         if raw:
             return r

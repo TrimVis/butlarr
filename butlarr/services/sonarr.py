@@ -88,12 +88,14 @@ class Sonarr(ExtArrService, ArrService):
                         self.get_clbk("language", state.index),
                     )
                 ],
-                [
-                    Button(
-                        f"View Seasons",
-                        self.get_clbk("seasons", state.index),
-                    )
-                ],
+                # TODO: add more option, not dependent on bazarr integration
+                #[
+                #    Button(
+                #        f"View Seasons",
+                #        self.get_clbk("seasons", state.index),
+                #    )
+                #],
+
                 #      [
                 #          Button(
                 #              f"Change Tags   (Total: {len(state.tags)})",
@@ -159,31 +161,19 @@ class Sonarr(ExtArrService, ArrService):
                 ]
                 for p in self.language_profiles
             ]
+        
         elif state.menu == "seasons":
             row_navigation = [Button("=== Seasons ===")]
-            rows_menu = [
-                [
-                    Button(
-                        f'Season {p.get("seasonNumber", "-")} ({p.get("statistics").get("episodeFileCount", "0")} / {p.get("statistics").get("episodeCount")})',
-                        self.get_clbk("episodes", p.get("seasonNumber", "0")),
-                    )
-                ]
-                for p in self.get_seasons(item["id"])
-            ]
+            rows_menu = self.get_btn_seasons(item["id"])
+
         elif state.menu == "episodes":
-            row_navigation = [Button(f"=== Episodes (Season {1}) ===")]
-            rows_menu = [
-                [
-                    Button(
-                        f'Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")}',
-                        self.get_clbk("selectSeasonEpisode", p.get("seasonNumber", "0"), p.get("episodeNumber", "0")),
-                    )
-                ]
-                for p in self.get_episodes(item["id"], 1)
-            ]
+            row_navigation = [Button(f"=== Episodes (Season {item['selectedSeasonNumber']}) ===")]
+            rows_menu = self.get_btn_episodes(item["id"], item["selectedSeasonNumber"])
+
         elif state.menu == "episode":
-            #row_navigation = [Button(f'=== Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")} ===')]
-            row_navigation = [Button('=== Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")} ===')]
+            row_navigation = []
+            #row_navigation = [Button(f'=== Ep. {item["selectedEpisodeNumber"]} ===')]
+
         else:
             if in_library:
                 monitored = item.get("monitored", True)
@@ -379,7 +369,6 @@ class Sonarr(ExtArrService, ArrService):
             "language",
             "selectlanguage",
             "addmenu",
-            "selectSeasonEpisode",
         ]
     )
     @sessionState()
@@ -445,7 +434,7 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
-        elif args[0] == "selectSeasonEpisode":
+        elif args[0] == "episode":
             state = replace(state, menu="episode")
 
 
@@ -493,60 +482,73 @@ class Sonarr(ExtArrService, ArrService):
         return Response(caption="Series removed!")
     
     @repaint
-    @callback(cmds=["seasons", "episodes"])
+    @callback(cmds=["seasons", "episodes", "episode"])
     @sessionState()
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def clbk_seasons(self, update, context, args, state):
-
-        if args[0] == "seasons":
-            state = replace(state, menu="seasons")
-        elif args[0] == "episodes":
-            state = replace(state, menu="episodes")
-            seasonNumber = args[1]
-
         if not state.items:
             return Response(
                 caption="No series found",
                 state=state,
             )
 
-        item = state.items[state.index]
+        items = state.items
+        item = items[state.index]
+
+        caption = f"{item['title']} "
+        if item["year"] and str(item["year"]) not in item["title"]:
+            caption += f"({item['year']}) "
+        if item["runtime"]:
+            caption += f"{item['runtime']}min "
+
+        if args[0] == "seasons":
+            state = replace(state, menu="seasons")
+        elif args[0] == "episodes":
+            state = replace(state, menu="episodes")
+            seasonNumber = args[1]
+            item["selectedSeasonNumber"] = seasonNumber
+            caption += f'\n\nSeason {seasonNumber}'
+        elif args[0] == "episode":
+            state = replace(state, menu="episode")
+            seasonNumber = args[1]
+            episodeNumber = args[2]
+            episodeId = args[3]
+            item["selectedSeasonNumber"] = seasonNumber
+            item["selectedEpisodeNumber"] = episodeNumber
+            item["selectedEpisodeId"] = episodeId
+            caption += f'\n\nSeason {seasonNumber}, Episode {episodeNumber}'
 
         keyboard_markup = self.keyboard(state, allow_edit=False)
         
         return Response(
-            caption='',
+            caption=caption,
             reply_markup=keyboard_markup,
             state=state,
         )
     
-    @repaint
-    @callback(cmds=["selectSeasonEpisode"])
-    @sessionState()
-    @authorized(min_auth_level=AuthLevels.USER.value)
-    async def clbk_episode(self, update, context, args, state):
-        '''
-        items = state.items
-        print('aqui1')
-        print(state.items[state.index])
-        items[state.index]["selectedSeason"] = args[0]
-        items[state.index]["selectedEpisode"] = args[1]
-        state = replace(state, items=items)
-        print('aqui')
-        print(state.items[state.index])
-        '''
+    def get_btn_seasons(self, seriesId) -> List:
+        return [
+            [
+                Button(
+                    f'Season {p.get("seasonNumber", "-")} ({p.get("statistics").get("episodeFileCount", "0")} / {p.get("statistics").get("totalEpisodeCount")})',
+                    self.get_clbk("episodes", p.get("seasonNumber")),
+                )
+            ]
+            for p in self.get_seasons(seriesId)
+        ]
+    
+    def get_btn_episodes(self, seriesId, seasonNumber) -> List:
+        return [
+            [
+                Button(
+                    f'Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")}',
+                    self.get_clbk("episode", seasonNumber, p.get("episodeNumber"), p.get("id")),
+                )
+            ]
+            for p in self.get_episodes(seriesId, seasonNumber)
+        ]
 
-        item = state.items[state.index]
-
-        keyboard_markup = self.keyboard(state, allow_edit=False)
-        
-        return Response(
-            caption='',
-            reply_markup=keyboard_markup,
-            state=state,
-        )
-
-    def get_seasons(self, seriesId) -> List[str]:
+    def get_seasons(self, seriesId) -> List:
         series = self.request(f'series/{seriesId}', fallback=[])
 
         if len(series) > 0:
@@ -554,7 +556,7 @@ class Sonarr(ExtArrService, ArrService):
         else:
             return series
     
-    def get_episodes(self, seriesId, seasonNumber) -> List[str]:
+    def get_episodes(self, seriesId, seasonNumber) -> List:
         params = {'seriesId': seriesId, 'seasonNumber': seasonNumber}
         episodes = self.request('episode', params=params, fallback=[])
         return episodes
