@@ -115,6 +115,21 @@ Following commands are available:
 
         return await update.message.reply_text(response_message, parse_mode="Markdown")
     
+    def media_caption(self, item, overview=True):
+        caption = f"{item['title']} "
+        if item["year"] and str(item["year"]) not in item["title"]:
+            caption += f"({item['year']}) "
+
+        if item["runtime"]:
+            caption += f"{item['runtime']}min "
+
+        caption += f"- {item['status'].title()}"
+        if overview:
+            caption += f"\n\n{item.get('overview', '')}"
+
+        caption = caption[0:1024]
+        return caption
+
     def load_addons(self):
         from ..config.services import SERVICES
         logger.info(f"Loading {self.name} addons")
