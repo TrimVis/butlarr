@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, Action, ServiceContent, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first, is_int
 from .ext import ExtArrService
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -16,6 +16,7 @@ from ..tg_handler.session_state import (
     default_session_state_key_fn,
 )
 from ..tg_handler.keyboard import Button, keyboard as keyboard
+
 
 @dataclass(frozen=True)
 class State:
@@ -163,16 +164,15 @@ class Sonarr(ExtArrService, ArrService):
             ]
         
         elif state.menu == "seasons":
-            row_navigation = [Button("=== Seasons ===")]
+            row_navigation = []
             rows_menu = self.get_btn_seasons(item["id"])
 
         elif state.menu == "episodes":
-            row_navigation = [Button(f"=== Episodes (Season {item['selectedSeasonNumber']}) ===")]
+            row_navigation = []
             rows_menu = self.get_btn_episodes(item["id"], item["selectedSeasonNumber"])
 
         elif state.menu == "episode":
             row_navigation = []
-            #row_navigation = [Button(f'=== Ep. {item["selectedEpisodeNumber"]} ===')]
 
         else:
             if in_library:
@@ -212,7 +212,7 @@ class Sonarr(ExtArrService, ArrService):
             ]
         
         for addon in self.addons:
-            addon_buttons = addon.addon_buttons(parent_state=state, parent_menu="addmenu", parent_service=self)
+            addon_buttons = addon.addon_buttons(parent_state=state, parent_service=self)
             rows_menu.append(addon_buttons)
 
         rows_action = []
@@ -250,7 +250,11 @@ class Sonarr(ExtArrService, ArrService):
                     ]
                 )
 
-        if state.menu:
+        if state.menu == "episodes":
+            rows_action.append([Button("🔙 Back", self.get_clbk("goto", "seasons"))])
+        elif state.menu == "episode":
+            rows_action.append([Button("🔙 Back", self.get_clbk("goto", "episodes"))])
+        elif state.menu:
             rows_action.append([Button("🔙 Back", self.get_clbk("goto"))])
         else:
             rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
@@ -268,15 +272,7 @@ class Sonarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
-
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
-        reply_message = reply_message[0:1024]
+        reply_message = self.media_caption(item)
 
         return Response(
             photo=item.get("remotePoster") if full_redraw else None,
@@ -391,7 +387,7 @@ class Sonarr(ExtArrService, ArrService):
 
         full_redraw = False
         if args[0] == "goto":
-            if len(args) > 1:
+            if len(args) > 1 and is_int(args[1]):
                 idx = int(args[1])
                 item = state.items[idx]
                 state = replace(
@@ -409,6 +405,10 @@ class Sonarr(ExtArrService, ArrService):
                     menu=None,
                 )
                 full_redraw = True
+            elif len(args) > 1 and not is_int(args[1]):
+                state = replace(state, menu=args[1])
+                if args[1] in ("seasons", "episodes", "episode"):
+                    allow_edit = False
             else:
                 state = replace(state, menu=None)
         elif args[0] == "tags":
@@ -436,7 +436,6 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, menu="add")
         elif args[0] == "episode":
             state = replace(state, menu="episode")
-
 
         return self.create_message(
             state, full_redraw=full_redraw, allow_edit=allow_edit
@@ -495,28 +494,29 @@ class Sonarr(ExtArrService, ArrService):
         items = state.items
         item = items[state.index]
 
-        caption = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            caption += f"({item['year']}) "
-        if item["runtime"]:
-            caption += f"{item['runtime']}min "
-
         if args[0] == "seasons":
             state = replace(state, menu="seasons")
+            caption = self.media_caption(item)
+
         elif args[0] == "episodes":
             state = replace(state, menu="episodes")
-            seasonNumber = args[1]
+            seasonNumber = args[1] if len(args) > 1 else item.get("selectedSeasonNumber")
             item["selectedSeasonNumber"] = seasonNumber
+            caption = self.media_caption(item)
             caption += f'\n\nSeason {seasonNumber}'
+
         elif args[0] == "episode":
             state = replace(state, menu="episode")
-            seasonNumber = args[1]
-            episodeNumber = args[2]
-            episodeId = args[3]
+
+            seasonNumber =  args[1] if len(args) > 1 else item.get("selectedSeasonNumber")
+            episodeNumber = args[2] if len(args) > 2 else item.get("selectedEpisodeNumber")
+            episodeId =     args[3] if len(args) > 3 else item.get("selectedEpisodeId")
+
             item["selectedSeasonNumber"] = seasonNumber
             item["selectedEpisodeNumber"] = episodeNumber
             item["selectedEpisodeId"] = episodeId
-            caption += f'\n\nSeason {seasonNumber}, Episode {episodeNumber}'
+
+            caption = self.episode_caption(item)
 
         keyboard_markup = self.keyboard(state, allow_edit=False)
         
@@ -525,6 +525,16 @@ class Sonarr(ExtArrService, ArrService):
             reply_markup=keyboard_markup,
             state=state,
         )
+    
+    def episode_caption(self, item):
+        episodeId = item.get("selectedEpisodeId")
+        episode = self.get_episode(episodeId)
+
+        caption = self.media_caption(item, overview=False)
+        caption += f'\nSeason {episode["seasonNumber"]}, Ep. {episode["episodeNumber"]} - {episode["title"]}'
+        caption+= f'\n\n{episode["overview"]}'
+
+        return caption
     
     def get_btn_seasons(self, seriesId) -> List:
         return [
@@ -560,3 +570,6 @@ class Sonarr(ExtArrService, ArrService):
         params = {'seriesId': seriesId, 'seasonNumber': seasonNumber}
         episodes = self.request('episode', params=params, fallback=[])
         return episodes
+    
+    def get_episode(self, episodeId):
+        return self.request(f'episode/{episodeId}', fallback=[])
