@@ -169,7 +169,7 @@ class Radarr(ExtArrService, ArrService):
             ]
         
         for addon in self.addons:
-            addon_buttons = addon.addon_buttons(parent_state=state, parent_menu="addmenu", parent_service=self)
+            addon_buttons = addon.addon_buttons(parent_state=state, parent_service=self, parent_menu="addmenu")
             rows_menu.append(addon_buttons)
 
         rows_action = []
@@ -225,15 +225,7 @@ class Radarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
-
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
-        reply_message = reply_message[0:1024]
+        reply_message = self.media_caption(item)
 
         return Response(
             photo=item.get("remotePoster") if full_redraw else None,
