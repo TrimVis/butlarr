@@ -8,6 +8,14 @@ from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
 
 
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
+
+
 def find_first(elems, check, fallback=0):
     try:
         result = next(e for e in elems if check(e))
