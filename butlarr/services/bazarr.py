@@ -60,6 +60,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         rows_action = []
         parent_service = state.addon_state.parent_service
         parent_menu = state.addon_state.parent_menu
+        parent_state = state.addon_state.parent_state
         
         if state.menu == 'list':
             if len(state.items) > 0:
@@ -86,7 +87,10 @@ class Bazarr(ExtArrService, ArrService, Addon):
         if state.menu == 'success':
             row_navigation = [Button("Subtitle downloaded!", "noop")]
         if parent_menu:
-            rows_action.append([Button("🔙 Go Back", parent_service.get_clbk(parent_menu))])
+            rows_action.append([Button("🔙 Back", parent_service.get_clbk(parent_menu))])
+        elif parent_state.menu:
+            rows_action.append([Button("🔙 Back", parent_service.get_clbk(parent_state.menu))])
+        
 
         return [row_navigation, *rows_menu, *rows_action]
 
@@ -180,13 +184,22 @@ class Bazarr(ExtArrService, ArrService, Addon):
                 reply_markup=keyboard_markup,
                 state=state,
             )
-
+        
         item = state.items[state.index]
+
+        parent_service = state.addon_state.parent_service
+        parent_state = state.addon_state.parent_state
+        media_item = parent_state.items[parent_state.index]
+
+        if ArrVariant(parent_service.arr_variant) == ArrVariant.SONARR:
+            reply_message = parent_service.episode_caption(media_item)
+        else:
+            reply_message = parent_service.media_caption(media_item)
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         return Response(
-            caption='',
+            caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
         )
@@ -256,6 +269,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
     def addon_buttons(self, state=None, **kwargs):
         parent_state = self.parent_state
         item = parent_state.items[parent_state.index]
+        in_library = "id" in item and item["id"]
 
         buttons = []
         if ArrVariant(self.parent_service.arr_variant) == ArrVariant.RADARR:
@@ -272,24 +286,27 @@ class Bazarr(ExtArrService, ArrService, Addon):
                 )
 
         elif ArrVariant(self.parent_service.arr_variant) == ArrVariant.SONARR:
-            downloaded = True          
 
-            if parent_state.menu == "add" and downloaded:
+            if parent_state.menu == "add" and in_library:
                 buttons.append(
                     Button(
-                        f"Seasons",
+                        f"Get Subtitles",
                         self.parent_service.get_clbk("seasons")
                     ),
                 )
 
-            elif parent_state.menu == "episode" and downloaded:
-                episodeId = item['selectedEpisodeId']
+            elif parent_state.menu == "episode" and in_library:
 
-                buttons.append(
-                    Button(
-                        f"Search for subtitles",
-                        self.get_clbk("list", episodeId)
-                    ),
-                )
+                episodeId = item['selectedEpisodeId']
+                episode = self.parent_service.get_episode(episodeId)
+                downloaded = True if episode['hasFile'] else False
+
+                if downloaded:
+                    buttons.append(
+                        Button(
+                            f"Search for subtitles",
+                            self.get_clbk("list", episodeId)
+                        ),
+                    )
         
         return buttons
