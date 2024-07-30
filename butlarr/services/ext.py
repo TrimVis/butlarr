@@ -162,9 +162,11 @@ class Addon:
     def config(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
+            key = kwargs.get('session_key')
+            self.state = self.session_db.get_session_entry(key)
             self.service = kwargs.get('parent')
             logger.debug(f'[Addon] Current service set: {self.service}')
-            self.state = kwargs.get('state')
+            self.state = self.session_db.get_session_entry(key)
             logger.debug(f'[Addon] Current service state set: {self.state.index}')
             self.menu = kwargs.get('menu')
             logger.debug(f'[Addon] Return menu set: {self.menu}')
