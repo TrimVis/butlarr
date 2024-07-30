@@ -60,7 +60,7 @@ class Sonarr(ExtArrService, ArrService):
         self.addons = addons
 
     @keyboard
-    def keyboard(self, state: State, allow_edit=None):
+    def keyboard(self, state: State, allow_edit=None, key=None):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
 
@@ -90,12 +90,12 @@ class Sonarr(ExtArrService, ArrService):
                     )
                 ],
                 # TODO: add more option, not dependent on bazarr integration
-                #[
-                #    Button(
-                #        f"View Seasons",
-                #        self.get_clbk("seasons", state.index),
-                #    )
-                #],
+                [
+                    Button(
+                        f"View Seasons",
+                        self.get_clbk("seasons", state.index),
+                    )
+                ],
 
                 #      [
                 #          Button(
@@ -212,7 +212,7 @@ class Sonarr(ExtArrService, ArrService):
             ]
         
         for addon in self.addons:
-            addon_buttons = addon.addon_buttons(parent_state=state, parent_service=self)
+            addon_buttons = addon.addon_buttons(parent=self, state=state, session_key=key)
             rows_menu.append(addon_buttons)
 
         rows_action = []
@@ -261,7 +261,7 @@ class Sonarr(ExtArrService, ArrService):
 
         return [row_navigation, *rows_menu, *rows_action]
 
-    def create_message(self, state: State, full_redraw=False, allow_edit=False):
+    def create_message(self, state: State, full_redraw=False, allow_edit=False, key=None):
         if not state.items:
             return Response(
                 caption="No series found",
@@ -270,7 +270,7 @@ class Sonarr(ExtArrService, ArrService):
 
         item = state.items[state.index]
 
-        keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
+        keyboard_markup = self.keyboard(state, allow_edit=allow_edit, key=key)
 
         reply_message = self.media_caption(item)
 
@@ -333,7 +333,7 @@ class Sonarr(ExtArrService, ArrService):
 
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
-        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
+        return self.create_message(state, full_redraw=True, allow_edit=allow_edit, key=default_session_state_key_fn(self, update))
 
     @command(cmds=[("help", "", "Shows only the sonarr help page")])
     async def cmd_help(self, update, context, args):

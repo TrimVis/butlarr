@@ -148,26 +148,26 @@ Following commands are available:
     
 
 @dataclass(frozen=True)
-class AddonState:
-    parent_service: ArrService = None
-    parent_state: any = None
-    parent_menu: str = None
+class ParentState:
+    service: ArrService = None
+    state: any = None
+    menu: str = None
 
 class Addon:
-    parent_service: ArrService = None
-    parent_state: any = None 
-    parent_menu: str = None
+    service: ArrService = None
+    state: any = None 
+    menu: str = None
 
     # Set the service and state that is loading this addon
     def config(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
-            self.parent_service = kwargs.get('parent_service')
-            logger.debug(f'[Addon] Current service set: {self.parent_service}')
-            self.parent_state = kwargs.get('parent_state')
-            logger.debug(f'[Addon] Current service state set: {self.parent_state.index}')
-            self.parent_menu = kwargs.get('parent_menu')
-            logger.debug(f'[Addon] Return menu set: {self.parent_menu}')
+            self.service = kwargs.get('parent')
+            logger.debug(f'[Addon] Current service set: {self.service}')
+            self.state = kwargs.get('state')
+            logger.debug(f'[Addon] Current service state set: {self.state.index}')
+            self.menu = kwargs.get('menu')
+            logger.debug(f'[Addon] Return menu set: {self.menu}')
             return func(self, *args, **kwargs)
 
         return wrapped_func
@@ -175,14 +175,14 @@ class Addon:
     def load(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
-            addon_state = {
-                'addon_state': AddonState(
-                    parent_service=self.parent_service,
-                    parent_state=self.parent_state,
-                    parent_menu=self.parent_menu
+            parent = {
+                'parent': ParentState(
+                    service=self.service,
+                    state=self.state,
+                    menu=self.menu
                 )
             }
-            return func(self, *args, **kwargs, **addon_state)
+            return func(self, *args, **kwargs, **parent)
         return wrapped_func
     
 
