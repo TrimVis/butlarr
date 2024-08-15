@@ -1,30 +1,22 @@
+import importlib
+
 from . import CONFIG
-from ..services.radarr import Radarr
-from ..services.sonarr import Sonarr
 
 APIS = CONFIG["apis"]
 SERVICES = []
 
 for service in CONFIG["services"]:
-    service_type = service["type"]
-    commands = service["commands"]
-    api_config = APIS[service["api"]]
+    try:
+        service_module = importlib.import_module(f"butlarr.services.{service["type"].lower()}")
+        ServiceConstructor = getattr(service_module, service["type"])
+    except Exception:
+        assert False, "Could not find a module for that service"
 
-    if service_type == "Radarr":
-        SERVICES.append(
-            Radarr(
-                commands=commands,
-                api_host=api_config["api_host"],
-                api_key=api_config["api_key"]
-            )
-        )
-    elif service_type == "Sonarr":
-        SERVICES.append(
-            Sonarr(
-                commands=commands,
-                api_host=api_config["api_host"],
-                api_key=api_config["api_key"]
-            )
-        )
-    else:
-        assert False, "Unsupported service type!"
+    api_config = APIS[service["api"]]
+    args = {
+        "commands": service["commands"],
+        "api_host": api_config["api_host"],
+        "api_key": api_config["api_key"],
+    }
+
+    SERVICES.append(ServiceConstructor(**args))
