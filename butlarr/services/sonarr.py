@@ -190,7 +190,7 @@ class Sonarr(ExtArrService, ArrService):
                     # Allow manual season search for already added entries
                     [
                         Button(
-                            f"Search for Seasons",
+                            f"🔍 Search for Seasons",
                             self.get_clbk("seasons", state.index),
                         ),
                     ],
