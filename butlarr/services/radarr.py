@@ -337,7 +337,7 @@ class Radarr(ExtArrService, ArrService):
             item = state.items[state.index]
             if "id" in item and item["id"] and not allow_edit:
                 # Don't do anything, illegal operation
-                return self.create_message(state, allow_edit=False)
+                return Response(caption="You are missing the permissions for this operation.")
 
         full_redraw = False
         if args[0] == "goto":
