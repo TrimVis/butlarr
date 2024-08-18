@@ -223,30 +223,19 @@ class Radarr(ExtArrService, ArrService):
 
         reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
         reply_message = reply_message[0:1024]
+        cover_url = item.get("remotePoster")
+        if not cover_url and len(item.get("images")):
+            cover_url = item.get("images")[0]["remoteUrl"]
 
         return Response(
-            photo=item.get("remotePoster") if full_redraw else None,
+            photo=cover_url if full_redraw else None,
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
         )
-
-    @repaint
-    @command(
-        default=True,
-        default_pattern="<title>",
-        default_description="Search for a movie",
-        cmds=[("search", "<title>", "Search for a series")],
-    )
-    @sessionState(init=True)
-    @authorized(min_auth_level=AuthLevels.USER)
-    async def cmd_default(self, update, context, args):
-        if len(args) > 1 and args[0] == "search":
-            args = args[1:]
-        title = " ".join(args)
-        items = self.lookup(title)
-
-        state = State(
+    
+    def _get_initial_state(self, items):
+        return State(
             items=items,
             index=0,
             root_folder=(
@@ -269,6 +258,22 @@ class Radarr(ExtArrService, ArrService):
             menu=None,
         )
 
+    @repaint
+    @command(
+        default=True,
+        default_pattern="<title>",
+        default_description="Search for a movie",
+        cmds=[("search", "<title>", "Search for a series")],
+    )
+    @sessionState(init=True)
+    @authorized(min_auth_level=AuthLevels.USER)
+    async def cmd_default(self, update, context, args):
+        if len(args) > 1 and args[0] == "search":
+            args = args[1:]
+        title = " ".join(args)
+        items = self.lookup(title)
+        state = self._get_initial_state(items)
+
         self.session_db.add_session_entry(
             default_session_state_key_fn(self, update), state
         )
@@ -286,6 +291,21 @@ class Radarr(ExtArrService, ArrService):
     @authorized(min_auth_level=AuthLevels.USER)
     async def cmd_queue(self, update, context, args):
         return await ExtArrService.cmd_queue(self, update, context, args)
+
+    @repaint
+    @command(cmds=[("list", "", "List all series in the library")])
+    @authorized(min_auth_level=AuthLevels.USER.value)
+    async def cmd_list(self, update, context, args):
+        items = self.list_()
+
+        state = self._get_initial_state(items)
+        self.session_db.add_session_entry(
+            default_session_state_key_fn(self, update), state
+        )
+
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
     @repaint
     @callback(cmds=["queue"])

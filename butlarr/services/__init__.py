@@ -51,7 +51,7 @@ class ArrService(TelegramHandler):
         return requests.post(
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
         )
-    
+
     def _put(self, endpoint, params={}):
         return requests.put(
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
@@ -146,6 +146,14 @@ class ArrService(TelegramHandler):
             fallback=[],
         )
 
+    def list_(self):
+        if not self.arr_variant:
+            return NotImplementedError(
+                "Unsupported Arr variant. You have to implement your own search"
+            )
+
+        return self.request(f"{self.arr_variant.value}", fallback=[])
+
     def lookup(self, term: str = None):
         if not self.arr_variant:
             return NotImplementedError(
@@ -174,10 +182,10 @@ class ArrService(TelegramHandler):
     ):
         assert item, "Missing required arg! You need to provide a item!"
 
-        item_id = item.get('id')
+        item_id = item.get("id")
         if item_id:
             action = Action.PUT
-            endpoint = f'{self.arr_variant.value}/{item_id}'
+            endpoint = f"{self.arr_variant.value}/{item_id}"
         else:
             action = Action.POST
             endpoint = self.arr_variant.value

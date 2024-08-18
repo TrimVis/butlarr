@@ -245,7 +245,10 @@ class Sonarr(ExtArrService, ArrService):
                     )
                     rows_action.append(
                         [
-                            Button(f"✅ + 🔍 Submit & Search", self.get_clbk("add", "search")),
+                            Button(
+                                f"✅ + 🔍 Submit & Search",
+                                self.get_clbk("add", "search"),
+                            ),
                         ]
                     )
         else:
@@ -309,30 +312,19 @@ class Sonarr(ExtArrService, ArrService):
         reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
         reply_message = reply_message[0:1024]
 
+        cover_url = item.get("remotePoster")
+        if not cover_url and len(item.get("images")):
+            cover_url = item.get("images")[0]["remoteUrl"]
+
         return Response(
-            photo=item.get("remotePoster") if full_redraw else None,
+            photo=cover_url if full_redraw else None,
             caption=reply_message,
             reply_markup=keyboard_markup,
             state=state,
         )
-
-    @repaint
-    @command(
-        default=True,
-        default_pattern="<title>",
-        default_description="Search for a series",
-        cmds=[("search", "<title>", "Search for a series")],
-    )
-    @sessionState(init=True)
-    @authorized(min_auth_level=AuthLevels.USER.value)
-    async def cmd_default(self, update, context, args):
-        if len(args) > 1 and args[0] == "search":
-            args = args[1:]
-        title = " ".join(args)
-
-        items = self.lookup(title)
-
-        state = State(
+    
+    def _get_initial_state(self, items):
+        return State(
             items=items,
             index=0,
             root_folder=(
@@ -364,6 +356,24 @@ class Sonarr(ExtArrService, ArrService):
             seasons=self._get_season_state(items[0]),
         )
 
+    @repaint
+    @command(
+        default=True,
+        default_pattern="<title>",
+        default_description="Search for a series",
+        cmds=[("search", "<title>", "Search for a series")],
+    )
+    @sessionState(init=True)
+    @authorized(min_auth_level=AuthLevels.USER.value)
+    async def cmd_default(self, update, context, args):
+        if len(args) > 1 and args[0] == "search":
+            args = args[1:]
+        title = " ".join(args)
+
+        items = self.lookup(title)
+
+        state = self._get_initial_state(items)
+
         self.session_db.add_session_entry(
             default_session_state_key_fn(self, update), state
         )
@@ -387,6 +397,21 @@ class Sonarr(ExtArrService, ArrService):
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def clbk_queue(self, update, context, args):
         return await ExtArrService.clbk_queue(self, update, context, args)
+
+    @repaint
+    @command(cmds=[("list", "", "List all series in the library")])
+    @authorized(min_auth_level=AuthLevels.USER.value)
+    async def cmd_list(self, update, context, args):
+        items = self.list_()
+
+        state = self._get_initial_state(items)
+        self.session_db.add_session_entry(
+            default_session_state_key_fn(self, update), state
+        )
+
+        auth_level = get_auth_level_from_message(self.db, update)
+        allow_edit = auth_level >= AuthLevels.MOD.value
+        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
 
     @repaint
     @callback(
@@ -424,6 +449,7 @@ class Sonarr(ExtArrService, ArrService):
             if "id" in item and item["id"] and not allow_edit:
                 # Don't do anything, illegal operation
                 return self.create_message(state, allow_edit=False)
+                #return Response(caption="You are missing the permissions for this operation.")
 
         full_redraw = False
         if args[0] == "goto":
@@ -512,8 +538,13 @@ class Sonarr(ExtArrService, ArrService):
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Series updated!" if state.items[state.index].get("id") 
-                                    else "Series added!")
+        return Response(
+            caption=(
+                "Series updated!"
+                if state.items[state.index].get("id")
+                else "Series added!"
+            )
+        )
 
     @clear
     @callback(cmds=["cancel"])
