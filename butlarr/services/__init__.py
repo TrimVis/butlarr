@@ -29,6 +29,7 @@ class ServiceContent(Enum):
     MOVIE = "movie"
     SERIES = "series"
 
+
 class ArrVariant(Enum):
     UNSUPPORTED = None
     SONARR = "series"

@@ -19,6 +19,12 @@ from ..tg_handler.keyboard import Button, keyboard
 
 
 @dataclass(frozen=True)
+class SeasonState:
+    available: List[int]
+    selected: List[int]
+
+
+@dataclass(frozen=True)
 class State:
     items: List[Any]
     index: int
@@ -26,6 +32,7 @@ class State:
     language_profile: str
     tags: List[str]
     root_folder: str
+    seasons: SeasonState
     menu: Optional[
         Literal["path"]
         | Literal["tags"]
@@ -52,6 +59,15 @@ class Sonarr(ExtArrService, ArrService):
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
+
+    def _get_season_state(self, item):
+        available_seasons = [e.get("seasonNumber") for e in item.get("seasons")]
+        monitored_seasons = []
+
+        return SeasonState(
+            available_seasons,
+            monitored_seasons,
+        )
 
     @keyboard
     def keyboard(self, state: State, allow_edit=None):
@@ -91,6 +107,24 @@ class Sonarr(ExtArrService, ArrService):
                 #      ],
             ]
 
+        elif state.menu == "seasons":
+            row_navigation = [Button("=== Search for Seasons ===")]
+            rows_menu = [
+                [
+                    Button(
+                        f"{'✔' if id in state.seasons.selected else '🔍'} Season {id}",
+                        self.get_clbk(
+                            (
+                                "noop"
+                                if id in state.seasons.selected
+                                else "searchseason"
+                            ),
+                            id,
+                        ),
+                    )
+                ]
+                for id in state.seasons.available
+            ]
         elif state.menu == "tags":
             row_navigation = [Button("=== Selecting Tags ===")]
             tags = self.get_tags() or []
@@ -153,10 +187,17 @@ class Sonarr(ExtArrService, ArrService):
                 monitored = item.get("monitored", True)
                 missing = not item.get("hasFile", False)
                 rows_menu = [
+                    # Allow manual season search for already added entries
+                    [
+                        Button(
+                            f"🔍 Search for Seasons",
+                            self.get_clbk("seasons", state.index),
+                        ),
+                    ],
                     [
                         Button("📺 Monitored" if monitored else "Unmonitored"),
                         Button("💾 Missing" if missing else "Downloaded"),
-                    ]
+                    ],
                 ]
             row_navigation = [
                 (
@@ -213,15 +254,35 @@ class Sonarr(ExtArrService, ArrService):
             elif state.menu == "add":
                 rows_action.append(
                     [
-                        Button(f"✅ Submit", self.get_clbk("add", "no-search")),
                         Button(
-                            f"✅+🔍 Submit & Search", self.get_clbk("add", "search")
+                            f"📚 Add (No Monitor)", self.get_clbk("add", "no-monitor")
                         ),
+                    ]
+                )
+                rows_action.append(
+                    [
+                        Button(f"📺 Monitor All", self.get_clbk("add", "no-search")),
+                        Button(f"🔍 Monitor & Search", self.get_clbk("add", "search")),
                     ]
                 )
 
         if state.menu:
-            rows_action.append([Button("🔙 Back", self.get_clbk("goto"))])
+            rows_action.append(
+                [
+                    Button(
+                        "🔙 Back",
+                        self.get_clbk(
+                            "goto"
+                            if state.menu and state.menu == "seasons"
+                            else (
+                                "addmenu"
+                                if state.menu and state.menu != "add"
+                                else "goto"
+                            )
+                        ),
+                    )
+                ]
+            )
         else:
             rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
 
@@ -270,6 +331,7 @@ class Sonarr(ExtArrService, ArrService):
         title = " ".join(args)
 
         items = self.lookup(title)
+
         state = State(
             items=items,
             index=0,
@@ -299,6 +361,7 @@ class Sonarr(ExtArrService, ArrService):
             ),
             tags=items[0].get("tags", []) if items else None,
             menu=None,
+            seasons=self._get_season_state(items[0]),
         )
 
         self.session_db.add_session_entry(
@@ -332,6 +395,8 @@ class Sonarr(ExtArrService, ArrService):
             "tags",
             "addtag",
             "remtag",
+            "seasons",
+            "searchseason",
             "path",
             "selectpath",
             "quality",
@@ -353,6 +418,7 @@ class Sonarr(ExtArrService, ArrService):
             "selectpath",
             "selectquality",
             "selectlanguage",
+            "searchseason",
         ]:
             item = state.items[state.index]
             if "id" in item and item["id"] and not allow_edit:
@@ -377,10 +443,26 @@ class Sonarr(ExtArrService, ArrService):
                     ),
                     tags=item.get("tags", []),
                     menu=None,
+                    seasons=self._get_season_state(item),
                 )
                 full_redraw = True
             else:
                 state = replace(state, menu=None)
+        elif args[0] == "seasons":
+            state = replace(state, menu="seasons")
+        elif args[0] == "searchseason":
+            self.request(
+                "command",
+                action=Action.POST,
+                params={
+                    "name": "SeasonSearch",
+                    "seriesId": item.get("id"),
+                    "seasonNumber": args[1],
+                },
+            )
+            new_selected = [*state.seasons.selected, int(args[1])]
+            season_state = replace(state.seasons, selected=new_selected)
+            state = replace(state, seasons=season_state)
         elif args[0] == "tags":
             state = replace(state, tags=[], menu="tags")
         elif args[0] == "addtag":
@@ -423,8 +505,8 @@ class Sonarr(ExtArrService, ArrService):
             options={
                 "addOptions": {
                     "searchForMissingEpisodes": args[1] == "search",
-                    "monitor": "all",
-                }
+                    "monitor": "none" if args[1] == "no-monitor" else "all",
+                },
             },
         )
         if not result:

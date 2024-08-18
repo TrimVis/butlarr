@@ -189,9 +189,9 @@ class Radarr(ExtArrService, ArrService):
             elif state.menu == "add":
                 rows_action.append(
                     [
-                        Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                        Button(f"📺 Monitor", self.get_clbk("add", "no-search")),
                         Button(
-                            f"✅+🔍 Submit & Search", self.get_clbk("add", "search")
+                            f"🔍 Monitor & Search", self.get_clbk("add", "search")
                         ),
                     ]
                 )
