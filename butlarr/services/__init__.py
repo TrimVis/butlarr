@@ -166,19 +166,6 @@ class ArrService(TelegramHandler):
     ):
         assert item, "Missing required arg! You need to provide a item!"
 
-        print(
-            {
-                **item,
-                "qualityProfileId": quality_profile_id,
-                "languageProfileId": language_profile_id,
-                "rootFolderPath": root_folder_path,
-                "tags": tags,
-                "monitored": monitored,
-                "minimumAvailability": min_availability,
-                **options,
-            }
-        )
-
         return self.request(
             self.arr_variant.value,
             action=Action.POST,
