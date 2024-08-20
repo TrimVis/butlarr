@@ -60,8 +60,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
         rows_action = []
 
         parent = state.parent.service
-        parent_menu = state.parent.menu
-        parent_state = state.parent.state
         
         if state.menu == 'list':
             if len(state.items) > 0:
@@ -87,10 +85,10 @@ class Bazarr(ExtArrService, ArrService, Addon):
         
         if state.menu == 'success':
             row_navigation = [Button("Subtitle downloaded!", "noop")]
-        if parent_menu:
-            rows_action.append([Button("🔙 Back", parent.get_clbk(parent_menu))])
-        elif parent_state.menu:
-            rows_action.append([Button("🔙 Back", parent.get_clbk(parent_state.menu))])
+        if state.menu:
+            rows_action.append([Button("🔙 Back", self.get_clbk(state.menu))])
+        elif parent.state.menu:
+            rows_action.append([Button("🔙 Exit", parent.get_clbk(parent.state.menu))])
         
 
         return [row_navigation, *rows_menu, *rows_action]
@@ -188,14 +186,14 @@ class Bazarr(ExtArrService, ArrService, Addon):
         
         item = state.items[state.index]
 
-        parent_service = state.parent.service
-        parent_state = state.parent.state
-        media_item = parent_state.items[parent_state.index]
+        parent = state.parent
 
-        if ArrVariant(parent_service.arr_variant) == ArrVariant.SONARR:
-            reply_message = parent_service.episode_caption(media_item)
+        media_item = parent.state.items[parent.state.index]
+
+        if ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
+            reply_message = parent.service.episode_caption(media_item)
         else:
-            reply_message = parent_service.media_caption(media_item)
+            reply_message = parent.service.media_caption(media_item)
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
@@ -216,10 +214,10 @@ class Bazarr(ExtArrService, ArrService, Addon):
     @authorized(min_auth_level=AuthLevels.USER)
     @Addon.load
     async def clbk_list(self, update, context, args, **kwargs):
+        parent = kwargs.get('parent')
 
         media_id = args[1]
-        arr_variant = self.service.arr_variant
-        parent_state = self.state
+        arr_variant = parent.service.arr_variant
         
         items = self.search(arr_variant=arr_variant, id=media_id)  
 
@@ -229,11 +227,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
             arr_variant=arr_variant,
             media_id=media_id,
             menu="list",
-            parent=kwargs.get('parent')
-        )
-
-        self.session_db.add_session_entry(
-            default_session_state_key_fn(self, update), state
+            parent=parent
         )
 
         auth_level = get_auth_level_from_message(self.db, update)
@@ -266,48 +260,58 @@ class Bazarr(ExtArrService, ArrService, Addon):
         
         return self.create_message(state, full_redraw=False)
     
-    @Addon.config
-    def addon_buttons(self, **kwargs):
-        parent_state = self.state
-        item = parent_state.items[parent_state.index]
+    @Addon.load
+    def radarr_integration(self, item, buttons, **kwargs):
+        parent = kwargs.get('parent')
+        downloaded = True if "movieFile" in item else False
+
+        if parent.state.menu == "add" and downloaded:
+            movieId = item.get("id")
+            
+            buttons.append(
+                Button(
+                    f"Search for subtitles",
+                    self.get_clbk("list", movieId)
+                ),
+            )
+        
+    @Addon.load
+    def sonarr_integration(self, item, buttons, **kwargs):
+        parent = kwargs.get('parent')
         in_library = "id" in item and item["id"]
 
-        buttons = []
-        if ArrVariant(self.service.arr_variant) == ArrVariant.RADARR:
-            downloaded = True if "movieFile" in item else False
-
-            if parent_state.menu == "add" and downloaded:
-                movieId = item.get("id")
-                
-                buttons.append(
-                    Button(
-                        f"Search for subtitles",
-                        self.get_clbk("list", movieId)
-                    ),
-                )
-
-        elif ArrVariant(self.service.arr_variant) == ArrVariant.SONARR:
-
-            if parent_state.menu == "add" and in_library:
+        if parent.state.menu == "add" and in_library:
                 buttons.append(
                     Button(
                         f"Get Subtitles",
-                        self.service.get_clbk("seasons")
+                        parent.service.get_clbk("seasons")
                     ),
                 )
 
-            elif parent_state.menu == "episode" and in_library:
+        elif parent.state.menu == "episode" and in_library:
 
-                episodeId = item['selectedEpisodeId']
-                episode = self.service.get_episode(episodeId)
-                downloaded = True if episode['hasFile'] else False
+            episodeId = item['selectedEpisodeId']
+            episode = parent.service.get_episode(episodeId)
+            downloaded = True if episode['hasFile'] else False
 
-                if downloaded:
-                    buttons.append(
-                        Button(
-                            f"Search for subtitles",
-                            self.get_clbk("list", episodeId)
-                        ),
-                    )
-        
+            if downloaded:
+                buttons.append(
+                    Button(
+                        f"Search for subtitles",
+                        self.get_clbk("list", episodeId)
+                    ),
+                )
+
+    @Addon.init
+    def addon_buttons(self, **kwargs):
+        parent = self.parent
+        item = parent.state.items[parent.state.index]
+
+        buttons = []
+        if ArrVariant(parent.service.arr_variant) == ArrVariant.RADARR:
+            self.radarr_integration(item, buttons)
+        elif ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
+            self.sonarr_integration(item, buttons)
+        else:
+            raise NotImplementedError(f'{parent.service.arr_variant} integration not implemented')
         return buttons

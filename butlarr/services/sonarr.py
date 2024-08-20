@@ -15,7 +15,7 @@ from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
 )
-from ..tg_handler.keyboard import Button, keyboard as keyboard
+from ..tg_handler.keyboard import Button, keyboard
 
 
 @dataclass(frozen=True)

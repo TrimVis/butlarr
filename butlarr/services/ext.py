@@ -3,6 +3,7 @@ from loguru import logger
 from typing import Dict, Any
 from functools import wraps
 from dataclasses import dataclass
+from datetime import datetime
 
 from . import ArrService, ArrVariant
 from ..config.queue import WIDTH, PAGE_SIZE
@@ -146,7 +147,6 @@ Following commands are available:
         self.addons = addons
         logger.debug(f"{self.name} service loaded Addons: {str(self.addons)}")
     
-
 @dataclass(frozen=True)
 class ParentState:
     service: ArrService = None
@@ -154,20 +154,30 @@ class ParentState:
     menu: str = None
 
 class Addon:
+    parent: ParentState = None
     service: ArrService = None
     state: any = None 
     menu: str = None
 
     # Set the service and state that is loading this addon
-    def config(func):
+    def init(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
-            self.service = kwargs.get('parent')
-            logger.debug(f'[Addon] Current service set: {self.service}')
-            self.state = kwargs.get('state')
-            logger.debug(f'[Addon] Current service state set: {self.state.index}')
-            self.menu = kwargs.get('menu')
-            logger.debug(f'[Addon] Return menu set: {self.menu}')
+            service = kwargs.get('parent')
+            logger.debug(f'[Addon] Current service set: {service}')
+            state = kwargs.get('state')
+            logger.debug(f'[Addon] Current service state set: {state.index}')
+            menu = kwargs.get('menu')
+            logger.debug(f'[Addon] Return menu set: {menu}')
+
+            parent = ParentState(
+                service=service,
+                state=state,
+                menu=menu
+            )
+
+            self.parent = parent
+
             return func(self, *args, **kwargs)
 
         return wrapped_func
@@ -176,16 +186,12 @@ class Addon:
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
             parent = {
-                'parent': ParentState(
-                    service=self.service,
-                    state=self.state,
-                    menu=self.menu
-                )
+                'parent': self.parent
             }
-            return func(self, *args, **kwargs, **parent)
+            return func(self, *args, **parent, **kwargs)
         return wrapped_func
     
 
-    @config
+    @init
     def addon_buttons(self, state, **kwargs): 
         raise NotImplementedError
