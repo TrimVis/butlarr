@@ -272,7 +272,7 @@ class Sonarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = self.media_caption(item)
+        reply_message = self.get_media_caption(item)
 
         return Response(
             photo=item.get("remotePoster") if full_redraw else None,
@@ -496,13 +496,13 @@ class Sonarr(ExtArrService, ArrService):
 
         if args[0] == "seasons":
             state = replace(state, menu="seasons")
-            caption = self.media_caption(item)
+            caption = self.get_media_caption(item)
 
         elif args[0] == "episodes":
             state = replace(state, menu="episodes")
             seasonNumber = args[1] if len(args) > 1 else item.get("selectedSeasonNumber")
             item["selectedSeasonNumber"] = seasonNumber
-            caption = self.media_caption(item)
+            caption = self.get_media_caption(item)
             caption += f'\n\nSeason {seasonNumber}'
 
         elif args[0] == "episode":
@@ -530,7 +530,7 @@ class Sonarr(ExtArrService, ArrService):
         episodeId = item.get("selectedEpisodeId")
         episode = self.get_episode(episodeId)
 
-        caption = self.media_caption(item, overview=False)
+        caption = self.get_media_caption(item, overview=False)
         caption += f'\nSeason {episode["seasonNumber"]}, Ep. {episode["episodeNumber"]} - {episode["title"]}'
         caption+= f'\n\n{episode["overview"]}'
 

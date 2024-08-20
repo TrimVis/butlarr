@@ -115,21 +115,6 @@ Following commands are available:
             response_message += f"\n - `/{self.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
 
         return await update.message.reply_text(response_message, parse_mode="Markdown")
-    
-    def media_caption(self, item, overview=True):
-        caption = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            caption += f"({item['year']}) "
-
-        if item["runtime"]:
-            caption += f"{item['runtime']}min "
-
-        caption += f"- {item['status'].title()}"
-        if overview:
-            caption += f"\n\n{item.get('overview', '')}"
-
-        caption = caption[0:1024]
-        return caption
 
     def load_addons(self):
         from ..config.services import SERVICES

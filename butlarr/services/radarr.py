@@ -225,7 +225,7 @@ class Radarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = self.media_caption(item)
+        reply_message = self.get_media_caption(item)
 
         return Response(
             photo=item.get("remotePoster") if full_redraw else None,

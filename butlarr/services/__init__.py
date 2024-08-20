@@ -125,6 +125,21 @@ class ArrService(TelegramHandler):
             api_version = status.get("version", "")
             assert api_version, "Could not find compatible api."
             return api_version
+    
+    def get_media_caption(self, item, overview=True):
+        caption = f"{item['title']} "
+        if item["year"] and str(item["year"]) not in item["title"]:
+            caption += f"({item['year']}) "
+
+        if item["runtime"]:
+            caption += f"{item['runtime']}min "
+
+        caption += f"- {item['status'].title()}"
+        if overview:
+            caption += f"\n\n{item.get('overview', '')}"
+
+        caption = caption[0:1024]
+        return caption
 
     def get_queue_item(self, id: int):
         return self.request(

@@ -193,7 +193,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         if ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
             reply_message = parent.service.episode_caption(media_item)
         else:
-            reply_message = parent.service.media_caption(media_item)
+            reply_message = parent.service.get_media_caption(media_item)
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
