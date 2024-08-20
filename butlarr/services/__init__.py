@@ -78,6 +78,9 @@ class ArrService(TelegramHandler):
         )
 
     def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None, raw=False):
+        if raw and fallback:
+            assert False, "Request response cannot be raw and have a fallback!"
+
         r = None
         if action == Action.GET:
             r = self._get(endpoint, params)
@@ -89,7 +92,7 @@ class ArrService(TelegramHandler):
             r = self._delete(endpoint, params)
 
         logger.debug(r.content)
-        
+
         if raw:
             return r
 
