@@ -179,14 +179,29 @@ apis:
   series:
     api_host: "<HOST_API_1>"
     api_key: "<API_KEY_1>"
+  subtitles:
+    api_host: "<HOST_API_2>"
+    api_key: "<API_KEY_2>"
 
 services:
   - type: "Radarr"
+    name: "radarr"
     commands: ["movie"]
     api: "movie"
+    addons:
+      - type: "Bazarr"
+        service_name: "bazarr"
   - type: "Sonarr"
+    name: "sonarr"
     commands: ["series"]
     api: "series"
+    addons:
+      - type: "Bazarr"
+        service_name: "bazarr"
+  - type: "Bazarr"
+    name: "bazarr"
+    commands: ["subtitles"]
+    api: "subtitles"
 ```
 
 There are 3 unique roles available: admin, mod, and user.
