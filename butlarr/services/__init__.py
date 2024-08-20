@@ -1,9 +1,8 @@
+import requests
 from dataclasses import dataclass
 from loguru import logger
 from enum import Enum
 from typing import List, Tuple, Optional, Any
-from gzip import decompress
-import requests
 from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
 
