@@ -272,8 +272,11 @@ class Bazarr(ExtArrService, ArrService, Addon):
     def radarr_integration(self, item, buttons, **kwargs):
         parent = kwargs.get('parent')
         downloaded = True if "movieFile" in item else False
+        
+        if not downloaded:
+            return
 
-        if parent.state.menu == "add" and downloaded:
+        if parent.state.menu == "add":
             movieId = item.get("id")
             
             buttons.append(
@@ -288,7 +291,10 @@ class Bazarr(ExtArrService, ArrService, Addon):
         parent = kwargs.get('parent')
         in_library = "id" in item and item["id"]
 
-        if parent.state.menu == "add" and in_library:
+        if not in_library:
+            return
+
+        if parent.state.menu == "add":
                 buttons.append(
                     Button(
                         f"🔍 Search for Subtitles",
@@ -296,7 +302,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
                     ),
                 )
 
-        elif parent.state.menu == "episode" and in_library:
+        elif parent.state.menu == "episode":
 
             episodeId = item['selectedEpisodeId']
             episode = parent.service.get_episode(episodeId)
