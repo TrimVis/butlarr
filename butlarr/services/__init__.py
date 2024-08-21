@@ -39,7 +39,6 @@ class ServiceContent(Enum):
     SUBTITLES = "subtitles"
 
 
-
 class ArrVariant(Enum):
     UNSUPPORTED = None
     RADARR = "movie"
@@ -54,6 +53,7 @@ class ArrService(TelegramHandler):
     api_version: str
     service_content: ServiceContent = None
     arr_variant: ArrVariant | str = None
+    addons: []
 
     root_folders: List[str] = []
     session_db: SessionDatabase = SessionDatabase()

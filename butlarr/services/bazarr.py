@@ -48,7 +48,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         self.arr_variant = ArrVariant.BAZARR
 
         self.name = name
-        self.supported_addons = []
+        self.supported_services = [ArrVariant.RADARR, ArrVariant.SONARR]
         self.addons = addons
         
     

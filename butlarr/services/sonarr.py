@@ -63,7 +63,6 @@ class Sonarr(ExtArrService, ArrService):
         self.language_profiles = self.get_language_profiles()
 
         self.name = name
-        self.supported_addons = [ArrVariant.BAZARR]
         self.addons = addons
 
     def _get_season_state(self, item):

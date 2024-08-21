@@ -50,7 +50,6 @@ class Radarr(ExtArrService, ArrService):
         self.quality_profiles = self.get_quality_profiles()
         
         self.name = name
-        self.supported_addons = [ArrVariant.BAZARR]
         self.addons = addons
 
 

@@ -125,9 +125,7 @@ class ParentState:
 
 class Addon:
     parent: ParentState = None
-    service: ArrService = None
-    state: any = None 
-    menu: str = None
+    supported_services = []
 
     # Set the service and state that is loading this addon
     def init(func):
