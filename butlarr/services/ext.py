@@ -116,21 +116,6 @@ Following commands are available:
 
         return await update.message.reply_text(response_message, parse_mode="Markdown")
 
-    def load_addons(self):
-        from ..config.services import SERVICES
-        logger.info(f"Loading {self.name} addons")
-        addons = []
-        for addon in self.addons:
-            for addon_service in SERVICES:
-                if addon_service.name == addon.get("service_name"):
-                    if addon_service.arr_variant in self.supported_addons:
-                        addons.append(addon_service)
-                        logger.info(f"Addon {addon_service.name} loaded")
-                    else:
-                        assert False, f"Unsupported addon service type {addon.get('type')}!"
-                        return False
-        self.addons = addons
-        logger.debug(f"{self.name} service loaded Addons: {str(self.addons)}")
     
 @dataclass(frozen=True)
 class ParentState:
