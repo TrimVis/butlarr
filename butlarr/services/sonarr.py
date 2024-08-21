@@ -639,7 +639,7 @@ class Sonarr(ExtArrService, ArrService):
 
         caption = self.get_media_caption(item, overview=False)
         caption += f'\nSeason {episode["seasonNumber"]}, Ep. {episode["episodeNumber"]} - {episode["title"]}'
-        caption+= f'\n\n{episode["overview"]}'
+        caption+= f'\n\n{episode.get("overview", "")}'
 
         return caption
     
