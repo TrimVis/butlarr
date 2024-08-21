@@ -105,13 +105,6 @@ class Sonarr(ExtArrService, ArrService):
                         self.get_clbk("language", state.index),
                     )
                 ],
-                # TODO: add more option, not dependent on bazarr integration
-                [
-                    Button(
-                        f"View Seasons",
-                        self.get_clbk("seasons", state.index),
-                    )
-                ],
 
                 #      [
                 #          Button(
@@ -197,7 +190,7 @@ class Sonarr(ExtArrService, ArrService):
                 for p in self.language_profiles
             ]
         
-        elif state.menu == "seasons":
+        elif state.menu == "season_list":
             row_navigation = []
             rows_menu = self.get_btn_seasons(item["id"])
 
@@ -300,13 +293,10 @@ class Sonarr(ExtArrService, ArrService):
                 )
 
         if state.menu == "episodes":
-            rows_action.append([Button("🔙 Back", self.get_clbk("goto", "seasons"))])
+            rows_action.append([Button("🔙 Back", self.get_clbk("goto", "season_list"))])
         elif state.menu == "episode":
             rows_action.append([Button("🔙 Back", self.get_clbk("goto", "episodes"))])
         elif state.menu:
-            rows_action.append([Button("🔙 Back", self.get_clbk("goto"))])
-            
-        if state.menu:
             rows_action.append(
                 [
                     Button(
@@ -450,6 +440,7 @@ class Sonarr(ExtArrService, ArrService):
             "addtag",
             "remtag",
             "seasons",
+            "season_list",
             "searchseason",
             "path",
             "selectpath",
@@ -502,7 +493,7 @@ class Sonarr(ExtArrService, ArrService):
                 full_redraw = True
             elif len(args) > 1 and not is_int(args[1]):
                 state = replace(state, menu=args[1])
-                if args[1] in ("seasons", "episodes", "episode"):
+                if args[1] in ("season_list", "episodes", "episode"):
                     allow_edit = False
             else:
                 state = replace(state, menu=None)
@@ -544,6 +535,8 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
+        elif args[0] == "season_list":
+            state = replace(state, menu="season_list")
         elif args[0] == "episode":
             state = replace(state, menu="episode")
 
@@ -596,7 +589,7 @@ class Sonarr(ExtArrService, ArrService):
         return Response(caption="Series removed!")
     
     @repaint
-    @callback(cmds=["seasons", "episodes", "episode"])
+    @callback(cmds=["season_list", "episodes", "episode"])
     @sessionState()
     @authorized(min_auth_level=AuthLevels.USER.value)
     async def clbk_seasons(self, update, context, args, state):
@@ -609,8 +602,8 @@ class Sonarr(ExtArrService, ArrService):
         items = state.items
         item = items[state.index]
 
-        if args[0] == "seasons":
-            state = replace(state, menu="seasons")
+        if args[0] == "season_list":
+            state = replace(state, menu="season_list")
             caption = self.get_media_caption(item)
 
         elif args[0] == "episodes":

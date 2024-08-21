@@ -59,7 +59,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         rows_menu = []
         rows_action = []
 
-        parent = state.parent.service
+        parent = state.parent
         
         if state.menu == 'list':
             if len(state.items) > 0:
@@ -85,10 +85,16 @@ class Bazarr(ExtArrService, ArrService, Addon):
         
         if state.menu == 'success':
             row_navigation = [Button("Subtitle downloaded!", "noop")]
-        if state.menu:
-            rows_action.append([Button("🔙 Back", self.get_clbk(state.menu))])
+        
+        if parent.menu:
+            # Back to menu defined on "addon_buttons" function
+            rows_action.append([Button("🔙 Back", parent.service.get_clbk(parent.menu))])
         elif parent.state.menu:
-            rows_action.append([Button("🔙 Exit", parent.get_clbk(parent.state.menu))])
+            # Back to current parent menu
+            rows_action.append([Button("🔙 Back", parent.service.get_clbk(parent.state.menu))])
+        elif state.menu:
+            # back to current addon menu (not used yet)
+            rows_action.append([Button("🔙 Back", self.get_clbk(state.menu))])
         
 
         return [row_navigation, *rows_menu, *rows_action]
@@ -216,7 +222,9 @@ class Bazarr(ExtArrService, ArrService, Addon):
     async def clbk_list(self, update, context, args, **kwargs):
         parent = kwargs.get('parent')
 
-        media_id = args[1]
+        media_item = parent.state.items[parent.state.index] 
+        media_id = media_item["id"] or args[1]
+
         arr_variant = parent.service.arr_variant
         
         items = self.search(arr_variant=arr_variant, id=media_id)  
@@ -270,7 +278,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
             
             buttons.append(
                 Button(
-                    f"Search for subtitles",
+                    f"🔍 Search for Subtitles",
                     self.get_clbk("list", movieId)
                 ),
             )
@@ -283,8 +291,8 @@ class Bazarr(ExtArrService, ArrService, Addon):
         if parent.state.menu == "add" and in_library:
                 buttons.append(
                     Button(
-                        f"Get Subtitles",
-                        parent.service.get_clbk("seasons")
+                        f"🔍 Search for Subtitles",
+                        parent.service.get_clbk("season_list")
                     ),
                 )
 
@@ -297,7 +305,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
             if downloaded:
                 buttons.append(
                     Button(
-                        f"Search for subtitles",
+                        f"🔍 Search for Subtitles",
                         self.get_clbk("list", episodeId)
                     ),
                 )
