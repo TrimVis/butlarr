@@ -189,15 +189,13 @@ services:
     commands: ["movie"]
     api: "movie"
     addons:
-      - type: "Bazarr"
-        service_name: "bazarr"
+      - service_name: "bazarr"
   - type: "Sonarr"
     name: "sonarr"
     commands: ["series"]
     api: "series"
     addons:
-      - type: "Bazarr"
-        service_name: "bazarr"
+      - service_name: "bazarr"
   - type: "Bazarr"
     name: "bazarr"
     commands: ["subtitles"]

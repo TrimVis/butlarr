@@ -48,7 +48,7 @@ def _load_services():
                 addons.append(addon_service)
                 logger.info(f"Addon {addon_service.name} loaded")
             else:
-                assert False, f"Unsupported addon service type {addon.get('type')}!"
+                assert False, f"Unsupported addon service type {service.arr_variant}!"
 
         service.addons = addons
         logger.debug(f"{service.name} service loaded Addons: {str(service.addons)}")
