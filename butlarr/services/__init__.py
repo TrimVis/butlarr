@@ -1,10 +1,18 @@
+import requests
 from dataclasses import dataclass
 from loguru import logger
 from enum import Enum
 from typing import List, Tuple, Optional, Any
-import requests
 from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
+
+
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
 
 
 def find_first(elems, check, fallback=0):
@@ -28,12 +36,14 @@ class Action(Enum):
 class ServiceContent(Enum):
     MOVIE = "movie"
     SERIES = "series"
+    SUBTITLES = "subtitles"
 
 
 class ArrVariant(Enum):
     UNSUPPORTED = None
-    SONARR = "series"
     RADARR = "movie"
+    SONARR = "series"
+    BAZARR = "subtitles"
 
 
 class ArrService(TelegramHandler):
@@ -43,6 +53,7 @@ class ArrService(TelegramHandler):
     api_version: str
     service_content: ServiceContent = None
     arr_variant: ArrVariant | str = None
+    addons: []
 
     root_folders: List[str] = []
     session_db: SessionDatabase = SessionDatabase()
@@ -67,7 +78,10 @@ class ArrService(TelegramHandler):
             f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
         )
 
-    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None):
+    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None, raw=False):
+        if raw and fallback:
+            assert False, "Request response cannot be raw and have a fallback!"
+
         r = None
         if action == Action.GET:
             r = self._get(endpoint, params)
@@ -77,6 +91,11 @@ class ArrService(TelegramHandler):
             r = self._put(endpoint, params)
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
+
+        logger.debug(r.content)
+
+        if raw:
+            return r
 
         if not r:
             return fallback
@@ -107,6 +126,21 @@ class ArrService(TelegramHandler):
             api_version = status.get("version", "")
             assert api_version, "Could not find compatible api."
             return api_version
+    
+    def get_media_caption(self, item, overview=True):
+        caption = f"{item['title']} "
+        if item["year"] and str(item["year"]) not in item["title"]:
+            caption += f"({item['year']}) "
+
+        if item["runtime"]:
+            caption += f"{item['runtime']}min "
+
+        caption += f"- {item['status'].title()}"
+        if overview:
+            caption += f"\n\n{item.get('overview', '')}"
+
+        caption = caption[0:1024]
+        return caption
 
     def get_queue_item(self, id: int):
         return self.request(

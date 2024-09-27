@@ -2,7 +2,7 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, Action, ServiceContent, find_first
+from . import ArrService, ArrVariant, Action, ServiceContent, find_first, is_int
 from .ext import ExtArrService
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
@@ -49,6 +49,8 @@ class Sonarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
+        name: str = None,
+        addons: List[ArrService] = []
     ):
         self.commands = commands
         self.api_key = api_key
@@ -59,6 +61,9 @@ class Sonarr(ExtArrService, ArrService):
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
+
+        self.name = name
+        self.addons = addons
 
     def _get_season_state(self, item):
         available_seasons = [e.get("seasonNumber") for e in item.get("seasons")]
@@ -99,6 +104,7 @@ class Sonarr(ExtArrService, ArrService):
                         self.get_clbk("language", state.index),
                     )
                 ],
+
                 #      [
                 #          Button(
                 #              f"Change Tags   (Total: {len(state.tags)})",
@@ -182,6 +188,18 @@ class Sonarr(ExtArrService, ArrService):
                 ]
                 for p in self.language_profiles
             ]
+        
+        elif state.menu == "season_list":
+            row_navigation = []
+            rows_menu = self.get_btn_seasons(item["id"])
+
+        elif state.menu == "episode_list":
+            row_navigation = []
+            rows_menu = self.get_btn_episodes(item["id"], item["selectedSeasonNumber"])
+
+        elif state.menu == "episode":
+            row_navigation = []
+
         else:
             if in_library:
                 monitored = item.get("monitored", True)
@@ -225,6 +243,10 @@ class Sonarr(ExtArrService, ArrService):
                     else Button()
                 ),
             ]
+        
+        for addon in self.addons:
+            addon_buttons = addon.addon_buttons(parent=self, state=state)
+            rows_menu.append(addon_buttons)
 
         rows_action = []
         if in_library:
@@ -269,7 +291,11 @@ class Sonarr(ExtArrService, ArrService):
                     ]
                 )
 
-        if state.menu:
+        if state.menu == "episode_list":
+            rows_action.append([Button("🔙 Back", self.get_clbk("goto_menu", "season_list"))])
+        elif state.menu == "episode":
+            rows_action.append([Button("🔙 Back", self.get_clbk("goto_menu", "episode_list"))])
+        elif state.menu:
             rows_action.append(
                 [
                     Button(
@@ -302,15 +328,7 @@ class Sonarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
-
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
-        reply_message = reply_message[0:1024]
+        reply_message = self.get_media_caption(item)
 
         cover_url = item.get("remotePoster")
         if not cover_url and len(item.get("images")):
@@ -417,10 +435,12 @@ class Sonarr(ExtArrService, ArrService):
     @callback(
         cmds=[
             "goto",
+            "goto_menu",
             "tags",
             "addtag",
             "remtag",
             "seasons",
+            "season_list",
             "searchseason",
             "path",
             "selectpath",
@@ -473,6 +493,9 @@ class Sonarr(ExtArrService, ArrService):
                 full_redraw = True
             else:
                 state = replace(state, menu=None)
+        elif args[0] == "goto_menu":
+            state = replace(state, menu=args[1])
+            allow_edit = False
         elif args[0] == "seasons":
             state = replace(state, menu="seasons")
         elif args[0] == "searchseason":
@@ -511,6 +534,10 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
+        elif args[0] == "season_list":
+            state = replace(state, menu="season_list")
+        elif args[0] == "episode":
+            state = replace(state, menu="episode")
 
         return self.create_message(
             state, full_redraw=full_redraw, allow_edit=allow_edit
@@ -559,3 +586,97 @@ class Sonarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Series removed!")
+    
+    @repaint
+    @callback(cmds=["season_list", "episode_list", "episode"])
+    @sessionState()
+    @authorized(min_auth_level=AuthLevels.ADMIN.value)
+    async def clbk_seasons(self, update, context, args, state):
+        if not state.items:
+            return Response(
+                caption="No series found",
+                state=state,
+            )
+
+        items = state.items
+        item = items[state.index]
+
+        if args[0] == "season_list":
+            state = replace(state, menu="season_list")
+            caption = self.get_media_caption(item)
+
+        elif args[0] == "episode_list":
+            state = replace(state, menu="episode_list")
+            seasonNumber = args[1] if len(args) > 1 else item.get("selectedSeasonNumber")
+            item["selectedSeasonNumber"] = seasonNumber
+            caption = self.get_media_caption(item)
+            caption += f'\n\nSeason {seasonNumber}'
+
+        elif args[0] == "episode":
+            state = replace(state, menu="episode")
+
+            seasonNumber =  args[1] if len(args) > 1 else item.get("selectedSeasonNumber")
+            episodeNumber = args[2] if len(args) > 2 else item.get("selectedEpisodeNumber")
+            episodeId =     args[3] if len(args) > 3 else item.get("selectedEpisodeId")
+
+            item["selectedSeasonNumber"] = seasonNumber
+            item["selectedEpisodeNumber"] = episodeNumber
+            item["selectedEpisodeId"] = episodeId
+
+            caption = self.episode_caption(item)
+
+        keyboard_markup = self.keyboard(state, allow_edit=False)
+        
+        return Response(
+            caption=caption,
+            reply_markup=keyboard_markup,
+            state=state,
+        )
+    
+    def episode_caption(self, item):
+        episodeId = item.get("selectedEpisodeId")
+        episode = self.get_episode(episodeId)
+
+        caption = self.get_media_caption(item, overview=False)
+        caption += f'\nSeason {episode["seasonNumber"]}, Ep. {episode["episodeNumber"]} - {episode["title"]}'
+        caption+= f'\n\n{episode.get("overview", "")}'
+
+        return caption
+    
+    def get_btn_seasons(self, seriesId) -> List:
+        return [
+            [
+                Button(
+                    f'Season {p.get("seasonNumber", "-")} ({p.get("statistics").get("episodeFileCount", "0")} / {p.get("statistics").get("totalEpisodeCount")})',
+                    self.get_clbk("episode_list", p.get("seasonNumber")),
+                )
+            ]
+            for p in self.get_seasons(seriesId)
+        ]
+    
+    def get_btn_episodes(self, seriesId, seasonNumber) -> List:
+        return [
+            [
+                Button(
+                    f'Ep. {p.get("episodeNumber", "-")} - {p.get("title", "Untitled")}',
+                    self.get_clbk("episode", seasonNumber, p.get("episodeNumber"), p.get("id")),
+                )
+            ]
+            for p in self.get_episodes(seriesId, seasonNumber)
+        ]
+
+    def get_seasons(self, seriesId) -> List:
+        series = self.request(f'series/{seriesId}', fallback=[])
+
+        if len(series) > 0:
+            return series.get('seasons')
+        else:
+            return series
+    
+    def get_episodes(self, seriesId, seasonNumber) -> List:
+        params = {'seriesId': seriesId, 'seasonNumber': seasonNumber}
+        episodes = self.request('episode', params=params, fallback=[])
+        return episodes
+    
+    def get_episode(self, episodeId):
+        return self.request(f'episode/{episodeId}', fallback=[])

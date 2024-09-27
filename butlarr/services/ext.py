@@ -1,8 +1,11 @@
 import math
+from loguru import logger
 from typing import Dict, Any
+from functools import wraps
 from dataclasses import dataclass
+from datetime import datetime
 
-from . import ArrService
+from . import ArrService, ArrVariant
 from ..config.queue import WIDTH, PAGE_SIZE
 
 from ..tg_handler import command, callback, handler, escape_markdownv2_chars
@@ -112,3 +115,51 @@ Following commands are available:
             response_message += f"\n - `/{self.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
 
         return await update.message.reply_text(response_message, parse_mode="Markdown")
+
+    
+@dataclass(frozen=True)
+class ParentState:
+    service: ArrService = None
+    state: any = None
+    menu: str = None
+
+class Addon:
+    parent: ParentState = None
+    supported_services = []
+
+    # Set the service and state that is loading this addon
+    def init(func):
+        @wraps(func)
+        def wrapped_func(self, *args, **kwargs):
+            service = kwargs.get('parent')
+            logger.debug(f'[Addon] Current service set: {service}')
+            state = kwargs.get('state')
+            logger.debug(f'[Addon] Current service state set: {state.index}')
+            menu = kwargs.get('menu')
+            logger.debug(f'[Addon] Return menu set: {menu}')
+
+            parent = ParentState(
+                service=service,
+                state=state,
+                menu=menu
+            )
+
+            self.parent = parent
+
+            return func(self, *args, **kwargs)
+
+        return wrapped_func
+    
+    def load(func):
+        @wraps(func)
+        def wrapped_func(self, *args, **kwargs):
+            parent = {
+                'parent': self.parent
+            }
+            return func(self, *args, **parent, **kwargs)
+        return wrapped_func
+    
+
+    @init
+    def addon_buttons(self, state, **kwargs): 
+        raise NotImplementedError

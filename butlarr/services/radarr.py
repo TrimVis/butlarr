@@ -37,7 +37,9 @@ class Radarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-    ):
+        name: str = None,
+        addons: List[ArrService] = []
+    ): 
         self.commands = commands
         self.api_key = api_key
 
@@ -46,6 +48,10 @@ class Radarr(ExtArrService, ArrService):
         self.arr_variant = ArrVariant.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
+        
+        self.name = name
+        self.addons = addons
+
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
@@ -160,6 +166,10 @@ class Radarr(ExtArrService, ArrService):
                     else Button()
                 ),
             ]
+        
+        for addon in self.addons:
+            addon_buttons = addon.addon_buttons(parent=self, state=state, menu="addmenu")
+            rows_menu.append(addon_buttons)
 
         rows_action = []
         if in_library:
@@ -214,15 +224,8 @@ class Radarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
-
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
-        reply_message = reply_message[0:1024]
+        reply_message = self.get_media_caption(item)
+        
         cover_url = item.get("remotePoster")
         if not cover_url and len(item.get("images")):
             cover_url = item.get("images")[0]["remoteUrl"]
@@ -416,3 +419,5 @@ class Radarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Movie removed!")
+
+        
