@@ -1,16 +1,8 @@
-import shlex
-
-from typing import List, Tuple, Callable, Optional
-from loguru import logger
 from functools import wraps
-from telegram.ext import CommandHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
-
-from ..database import Database
+from typing import List, Optional
 
 
 @dataclass(frozen=True)

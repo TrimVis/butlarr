@@ -1,14 +1,11 @@
 import shlex
-import inspect
 
 from typing import List, Tuple, Callable
 from loguru import logger
-from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
 from typing import TypeAlias
 
 from ..config.commands import AUTH_COMMAND, HELP_COMMAND
-from ..config.secrets import ADMIN_AUTH_PASSWORD
 from ..database import Database
 
 
@@ -42,25 +39,32 @@ CmdDescription: TypeAlias = str  # Help text: Description of command
 Cmd: TypeAlias = CmdStr | Tuple[CmdStr, CmdPattern, CmdDescription]
 
 
-
 def get_help_handler(services):
     response_message = f"""
 Welcome to *butlarr*! \n
 *butlarr* is a bot that helps you interact with various _arr_ services. \n
-To use this service you have to authorize using a password first: `/{AUTH_COMMAND} <password>`. \n
+To use this service you have to authorize using a password first: `/{
+        AUTH_COMMAND} <password>`. \n
 After doing so you can interact with the various services using:
     """
     for s in services:
         for cmd in s.commands:
-            response_message += f"\n - `/{cmd} {escape_markdownv2_chars(s.default_pattern)}` \t _{escape_markdownv2_chars(s.default_description)}_"
+            pattern = escape_markdownv2_chars(s.default_pattern)
+            desc = escape_markdownv2_chars(s.default_description)
+            response_message += f"\n - `/{cmd} {pattern}` \t _{desc}_"
     response_message += "\n"
 
     for s in services:
         for cmd, pattern, desc, _ in s.sub_commands:
-            response_message += f"\n - `/{s.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
+            pattern = escape_markdownv2_chars(pattern)
+            desc = escape_markdownv2_chars(desc)
+            response_message += f"\n - `/{s.commands[0]
+                                          } {cmd} {pattern}` \t _{desc}_"
 
     async def handler(update, context):
-        await update.message.reply_text(response_message, parse_mode="Markdown")
+        await update.message.reply_text(
+            response_message, parse_mode="Markdown"
+        )
 
     return CommandHandler(HELP_COMMAND, handler)
 
@@ -129,10 +133,12 @@ def handler(cls):
     for method in list(cls.__dict__.values()):
         if hasattr(method, "cmd_cmds"):
             cls.sub_commands += [
-                (cmd, pattern, desc, method) for (cmd, pattern, desc) in method.cmd_cmds
+                (cmd, pattern, desc, method)
+                for (cmd, pattern, desc) in method.cmd_cmds
             ]
         if hasattr(method, "cmd_default"):
-            assert not has_default_command, f"Only one default command allowed."
+            assert not has_default_command, \
+                "Only one default command allowed."
             cls.default_command = method
             (desc, pattern) = method.cmd_default
             cls.default_description = desc
@@ -141,7 +147,8 @@ def handler(cls):
         if hasattr(method, "clbk_cmds"):
             cls.sub_callbacks += [(cmd, method) for cmd in method.clbk_cmds]
         if hasattr(method, "clbk_default"):
-            assert not has_default_callback, "Only one default callback allowed."
+            assert not has_default_callback, \
+                "Only one default callback allowed."
             cls.default_callback = method
             has_default_callback = True
 

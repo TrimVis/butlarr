@@ -1,16 +1,12 @@
-import shlex
-
-from typing import List, Tuple, Callable, Optional, Literal
+from typing import Optional, Literal
 from loguru import logger
 from functools import wraps
-from telegram.ext import CommandHandler, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
 from dataclasses import dataclass
 from typing import Any
 
-from ..database import Database
+MISSING_IMG = "https://artworks.thetvdb.com/banners/images/missing/movie.jpg"
 
 bad_request_poster_error_messages = [
     "Wrong type of the web page content",
@@ -20,7 +16,9 @@ bad_request_poster_error_messages = [
 
 no_caption_error_messages = ["There is no caption in the message to edit"]
 no_edit_error_messages = [
-    "Message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message"
+    "Message is not modified: specified new message content and reply markup"
+    + " are exactly the same as a current content and reply"
+    + " markup of the message"
 ]
 
 
@@ -104,7 +102,8 @@ def repaint(func):
             except BadRequest as e:
                 if str(e) in bad_request_poster_error_messages:
                     logger.error(
-                        f"Error sending photo [{message.photo}]: BadRequest: {e}. Attempting to send with default poster..."
+                        f"Error sending photo [{message.photo}]: BadRequest: {
+                            e}. Attempting to send with default poster..."
                     )
                     await context.bot.send_photo(
                         chat_id=(
@@ -112,7 +111,7 @@ def repaint(func):
                             if update.message
                             else update.callback_query.message.chat.id
                         ),
-                        photo="https://artworks.thetvdb.com/banners/images/missing/movie.jpg",
+                        photo=MISSING_IMG,
                         caption=message.caption,
                         reply_markup=message.reply_markup,
                     )

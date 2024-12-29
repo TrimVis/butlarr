@@ -2,18 +2,18 @@ from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, Action, ServiceContent, find_first
-from .ext import ExtArrService, QueueState, Addon, ParentState
+from . import ArrService, ArrVariant, Action, ServiceContent
+from .ext import ExtArrService, Addon, ParentState
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
     repaint,
-    clear,
 )
-from ..tg_handler.auth import authorized, AuthLevels, get_auth_level_from_message
+from ..tg_handler.auth import (
+    authorized, AuthLevels, get_auth_level_from_message
+)
 from ..tg_handler.session_state import (
     sessionState,
-    default_session_state_key_fn,
 )
 from ..tg_handler.keyboard import Button, keyboard
 
@@ -42,7 +42,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
     ):
         self.commands = commands
         self.api_key = api_key
-        
+
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.SUBTITLES
         self.arr_variant = ArrVariant.BAZARR
@@ -50,8 +50,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         self.name = name
         self.supported_services = [ArrVariant.RADARR, ArrVariant.SONARR]
         self.addons = addons
-        
-    
+
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
 
@@ -60,7 +59,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
         rows_action = []
 
         parent = state.parent
-        
+
         if state.menu == 'list':
             if len(state.items) > 0:
                 row_navigation = [Button("=== Subtitles ===", "noop")]
@@ -81,24 +80,25 @@ class Bazarr(ExtArrService, ArrService, Addon):
                     ]
                 )
                 current_index = current_index + 1
-                if current_index >= 5: break
-        
+                if current_index >= 5:
+                    break
+
         if state.menu == 'success':
             row_navigation = [Button("Subtitle downloaded!", "noop")]
-        
+
         if parent.menu:
             # Back to menu defined on "addon_buttons" function
-            rows_action.append([Button("🔙 Back", parent.service.get_clbk(parent.menu))])
+            rows_action.append(
+                [Button("🔙 Back", parent.service.get_clbk(parent.menu))])
         elif parent.state.menu:
             # Back to current parent menu
-            rows_action.append([Button("🔙 Back", parent.service.get_clbk(parent.state.menu))])
+            rows_action.append(
+                [Button("🔙 Back", parent.service.get_clbk(parent.state.menu))])
         elif state.menu:
             # back to current addon menu (not used yet)
             rows_action.append([Button("🔙 Back", self.get_clbk(state.menu))])
-        
 
         return [row_navigation, *rows_menu, *rows_action]
-
 
     def detect_api(self, api_host):
         status = None
@@ -109,26 +109,29 @@ class Bazarr(ExtArrService, ArrService, Addon):
         finally:
             if status is None:
                 logger.error(
-                    "Could not reach compatible api. Is the service down? Is your API key correct?"
+                    "Could not reach compatible api. Is the service down?"
+                    + " Is your API key correct?"
                 )
                 exit(1)
             assert (
                 status
-            ), "Could not reach compatible api. Is the service down? Is your API key correct?"
+            ), ("Could not reach compatible api. Is the service down?"
+                + " Is your API key correct?")
             api_version = status.get("data", {}).get("bazarr_version", "")
             assert api_version, "Could not find compatible api."
             return api_version
-    
-    
+
     def search(self, arr_variant, id):
         if arr_variant == ArrVariant.RADARR:
-            status = self.request('providers/movies', params={'radarrid': id}, fallback=[])
+            status = self.request('providers/movies',
+                                  params={'radarrid': id}, fallback=[])
             return status.get('data') if len(status) > 0 else status
         if arr_variant == ArrVariant.SONARR:
-            status = self.request('providers/episodes', params={'episodeid': id}, fallback=[])
+            status = self.request('providers/episodes',
+                                  params={'episodeid': id}, fallback=[])
             return status.get('data') if len(status) > 0 else status
         else:
-            assert False, f"Bazarr integration not Implemented"
+            assert False, "Bazarr integration not Implemented"
 
     def download(
         self,
@@ -140,11 +143,11 @@ class Bazarr(ExtArrService, ArrService, Addon):
         assert item, "Missing required arg! You need to provide a item!"
 
         if service == ArrVariant.RADARR:
-            
+
             method = 'providers/movies'
             params = {
-                "radarrid": id, 
-                "hi": item.get('hearing_impaired'), 
+                "radarrid": id,
+                "hi": item.get('hearing_impaired'),
                 "forced": item.get('forced'),
                 "original_format": item.get('original_format'),
                 "provider": item.get('provider'),
@@ -153,12 +156,12 @@ class Bazarr(ExtArrService, ArrService, Addon):
             }
 
         elif service == ArrVariant.SONARR:
-            
+
             method = 'providers/episodes'
             params = {
                 "seriesid": item.get('id'),
                 "episodeid": id,
-                "hi": item.get('hearing_impaired'), 
+                "hi": item.get('hearing_impaired'),
                 "forced": item.get('forced'),
                 "original_format": item.get('original_format'),
                 "provider": item.get('provider'),
@@ -171,16 +174,17 @@ class Bazarr(ExtArrService, ArrService, Addon):
                 f"Bazarr integration with service {service} is Not Implemented"
             )
             return False
-        
-        return self.request(
-                method,
-                action=Action.POST,
-                params=params,
-                raw=True
-            )
 
-    
-    def create_message(self, state: State, full_redraw=False, allow_edit=False):
+        return self.request(
+            method,
+            action=Action.POST,
+            params=params,
+            raw=True
+        )
+
+    def create_message(
+            self, state: State, full_redraw=False, allow_edit=False
+    ):
         if not state.items:
             keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
@@ -189,8 +193,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
                 reply_markup=keyboard_markup,
                 state=state,
             )
-        
-        item = state.items[state.index]
 
         parent = state.parent
 
@@ -222,12 +224,12 @@ class Bazarr(ExtArrService, ArrService, Addon):
     async def clbk_list(self, update, context, args, **kwargs):
         parent = kwargs.get('parent')
 
-        media_item = parent.state.items[parent.state.index] 
+        media_item = parent.state.items[parent.state.index]
         media_id = media_item["id"] or args[1]
 
         arr_variant = parent.service.arr_variant
-        
-        items = self.search(arr_variant=arr_variant, id=media_id)  
+
+        items = self.search(arr_variant=arr_variant, id=media_id)
 
         state = State(
             items=items,
@@ -240,7 +242,9 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.USER.value
-        return self.create_message(state, full_redraw=False, allow_edit=allow_edit)
+        return self.create_message(
+            state, full_redraw=False, allow_edit=allow_edit
+        )
 
     @repaint
     @callback(cmds=["download"])
@@ -251,41 +255,43 @@ class Bazarr(ExtArrService, ArrService, Addon):
         logger.debug(f"Return to menu {state.parent.state.menu}")
 
         state = replace(
-                    state,
-                    index=0,
-                    menu="success",
-                )
+            state,
+            index=0,
+            menu="success",
+        )
 
         result = self.download(
-            id = state.media_id,
+            id=state.media_id,
             service=state.arr_variant,
             item=state.items[state.index]
         )
 
         if result.status_code < 200 \
-        or result.status_code > 299:
-            return Response(caption=f"Something went wrong... {result.content}")
-        
+                or result.status_code > 299:
+            return Response(
+                caption=f"Something went wrong... {result.content}"
+            )
+
         return self.create_message(state, full_redraw=False)
-    
+
     @Addon.load
     def radarr_integration(self, item, buttons, **kwargs):
         parent = kwargs.get('parent')
         downloaded = True if "movieFile" in item else False
-        
+
         if not downloaded:
             return
 
         if parent.state.menu == "add":
             movieId = item.get("id")
-            
+
             buttons.append(
                 Button(
-                    f"🔍 Search for Subtitles",
+                    "🔍 Search for Subtitles",
                     self.get_clbk("list", movieId)
                 ),
             )
-        
+
     @Addon.load
     def sonarr_integration(self, item, buttons, **kwargs):
         parent = kwargs.get('parent')
@@ -295,12 +301,12 @@ class Bazarr(ExtArrService, ArrService, Addon):
             return
 
         if parent.state.menu == "add":
-                buttons.append(
-                    Button(
-                        f"🔍 Search for Subtitles",
-                        parent.service.get_clbk("season_list")
-                    ),
-                )
+            buttons.append(
+                Button(
+                    "🔍 Search for Subtitles",
+                    parent.service.get_clbk("season_list")
+                ),
+            )
 
         elif parent.state.menu == "episode":
 
@@ -311,7 +317,7 @@ class Bazarr(ExtArrService, ArrService, Addon):
             if downloaded:
                 buttons.append(
                     Button(
-                        f"🔍 Search for Subtitles",
+                        "🔍 Search for Subtitles",
                         self.get_clbk("list", episodeId)
                     ),
                 )
@@ -327,5 +333,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
         elif ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
             self.sonarr_integration(item, buttons)
         else:
-            raise NotImplementedError(f'{parent.service.arr_variant} integration not implemented')
+            raise NotImplementedError(
+                f'{parent.service.arr_variant} integration not implemented')
         return buttons

@@ -3,17 +3,12 @@ from loguru import logger
 from typing import Dict, Any
 from functools import wraps
 from dataclasses import dataclass
-from datetime import datetime
 
-from . import ArrService, ArrVariant
+from . import ArrService
 from ..config.queue import WIDTH, PAGE_SIZE
 
-from ..tg_handler import command, callback, handler, escape_markdownv2_chars
-from ..tg_handler.keyboard import keyboard
+from ..tg_handler import handler, escape_markdownv2_chars
 from ..tg_handler.message import Response
-from ..tg_handler.message import Response, repaint, clear
-from ..tg_handler.auth import authorized
-from ..tg_handler.session_state import sessionState, default_session_state_key_fn
 from ..tg_handler.keyboard import Button, keyboard
 
 
@@ -48,16 +43,26 @@ class ExtArrService(ArrService):
         lines = ["*Queue*", ""]
         offset = state.page * state.page_size + 1
         for idx, item in enumerate(state.items["records"]):
-            percent = 1.0 - (float(item.get("sizeleft", 0)) / (item.get("size") or 1))
+            percent = 1.0 - (float(item.get("sizeleft", 0)) /
+                             (item.get("size") or 1))
             progress = math.floor(percent * WIDTH)
             remaining = math.ceil((1.0 - percent) * WIDTH)
 
-            title = escape_markdownv2_chars(item.get("title", "")[0 : 2 * WIDTH])
+            title = escape_markdownv2_chars(
+                item.get("title", "")[0: 2 * WIDTH])
             title_ln = rf"{offset + idx}\. *{title}*"
             progress_ln = (
-                rf">`[{progress * '='}|{(remaining*' ')}]` {round(percent*100)}%"
+                rf">`[{progress * '='}|{(remaining*' ')
+                                        }]` {round(percent*100)}%"
             )
-            status_ln = rf">Status: _{escape_markdownv2_chars(item.get('status', 'N/A'))}_ \(_{escape_markdownv2_chars(item.get('trackedDownloadState', '-'))}_\)   Time left: _{escape_markdownv2_chars(item.get('timeleft', 'N/A'))}_"
+
+            status = escape_markdownv2_chars(item.get('status', 'N/A'))
+            download_state = escape_markdownv2_chars(
+                item.get('trackedDownloadState', '-'))
+            time_left = escape_markdownv2_chars(item.get('timeleft', 'N/A'))
+
+            status_ln = rf">Status: _{status}_ \(_{
+                download_state}_\)   Time left: _{time_left}_"
 
             lines += [title_ln, progress_ln, status_ln]
 
@@ -68,7 +73,7 @@ class ExtArrService(ArrService):
             lines += [(state.page_size - len(lines)) * "\n"]
 
         total_pages = int(state.items["totalRecords"]) // state.page_size
-        lines.append(f"\t\tPage _{state.page}_ of _{total_pages }_")
+        lines.append(f"\t\tPage _{state.page}_ of _{total_pages}_")
 
         reply_message = "\n".join(lines)
         keyboard_markup = self.create_queue_keyboard(state)
@@ -105,23 +110,32 @@ class ExtArrService(ArrService):
     async def cmd_help(self, update, context, args):
         response_message = f"""
 *butlarr* - Help page for {type(self).__name__} service.
-        
+
 Following commands are available:
         """
         for cmd in self.commands:
-            response_message += f"\n - `/{cmd} {escape_markdownv2_chars(self.default_pattern)}` \t _{escape_markdownv2_chars(self.default_description)}_\n"
+            pattern = escape_markdownv2_chars(
+                self.default_pattern)
+            desc = escape_markdownv2_chars(self.default_description)
+            response_message += f"\n - `/{cmd} {pattern}` \t _{desc}_\n"
 
         for cmd, pattern, desc, _ in self.sub_commands:
-            response_message += f"\n - `/{self.commands[0]} {cmd} {escape_markdownv2_chars(pattern)}` \t _{escape_markdownv2_chars(desc)}_"
+            pattern = escape_markdownv2_chars(pattern)
+            desc = escape_markdownv2_chars(desc)
+            response_message += f"\n - `/{self.commands[0]} {
+                cmd} {pattern}` \t _{desc}_"
 
-        return await update.message.reply_text(response_message, parse_mode="Markdown")
+        return await update.message.reply_text(
+            response_message, parse_mode="Markdown"
+        )
 
-    
+
 @dataclass(frozen=True)
 class ParentState:
     service: ArrService = None
     state: any = None
     menu: str = None
+
 
 class Addon:
     parent: ParentState = None
@@ -149,7 +163,7 @@ class Addon:
             return func(self, *args, **kwargs)
 
         return wrapped_func
-    
+
     def load(func):
         @wraps(func)
         def wrapped_func(self, *args, **kwargs):
@@ -158,8 +172,7 @@ class Addon:
             }
             return func(self, *args, **parent, **kwargs)
         return wrapped_func
-    
 
     @init
-    def addon_buttons(self, state, **kwargs): 
+    def addon_buttons(self, state, **kwargs):
         raise NotImplementedError
