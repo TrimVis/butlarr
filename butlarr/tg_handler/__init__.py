@@ -77,7 +77,7 @@ def get_clbk_handler(services):
             return
         logger.debug(f"Received callback: {args}")
         for s in services:
-            if args[0] == s.commands[0]:
+            if s.commands and args[0] == s.commands[0]:
                 return await s.handle_callback(update, context)
         logger.error("Found no matching callback handler!")
 

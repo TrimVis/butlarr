@@ -2,6 +2,7 @@ import importlib
 from loguru import logger
 
 from . import CONFIG
+from ..services.addon import Addon
 
 APIS = CONFIG["apis"]
 SERVICES = []
@@ -27,11 +28,13 @@ def _load_services():
         api_config = APIS[service["api"]]
 
         args = {
-            "commands": service["commands"],
+            "commands": service.get("commands", []),
             "api_host": api_config["api_host"],
             "api_key": api_config["api_key"],
-            "name": service.get("name", service["commands"][0])
+            "name": service.get("name", None)
         }
+
+        assert args["name"], f"Missing 'name' field for '{service['type']}'"
 
         SERVICES.append(ServiceConstructor(**args))
         service_addons.append(service.get("addons", []))
@@ -41,11 +44,15 @@ def _load_services():
             continue
 
         logger.info(f"Injecting addons for '{service.name}'")
-        service.inject_addons([
+        addon_services = [
             s
             for s in SERVICES
             if s.name in addons
-        ])
+        ]
+        for addon in addon_services:
+            assert isinstance(addon, Addon), \
+                "The addon wrapper can only be used with addons"
+        service.inject_addons(addon_services)
 
 
 _load_services()

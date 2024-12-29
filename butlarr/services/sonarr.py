@@ -1,8 +1,9 @@
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, Action, ServiceContent, find_first
+from . import ArrVariant, Action, ServiceContent, find_first
 from .ext import ExtArrService
+from .addon import addon_buttons, ADDON_PLACEHOLDER
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
@@ -43,7 +44,7 @@ class State:
 
 
 @handler
-class Sonarr(ExtArrService, ArrService):
+class Sonarr(ExtArrService):
     def __init__(
         self,
         commands: List[str],
@@ -51,6 +52,7 @@ class Sonarr(ExtArrService, ArrService):
         api_key: str,
         name: str,
     ):
+        super().__init__()
         self.commands = commands
         self.api_key = api_key
         self.name = name
@@ -64,7 +66,7 @@ class Sonarr(ExtArrService, ArrService):
 
     def _get_season_state(self, item):
         available_seasons = [e.get("seasonNumber")
-                             for e in item.get("seasons")]
+                             for e in item.get("seasons")] if item else []
         monitored_seasons = []
 
         return SeasonState(
@@ -73,6 +75,7 @@ class Sonarr(ExtArrService, ArrService):
         )
 
     @keyboard
+    @addon_buttons
     def keyboard(self, state: State, allow_edit=None):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
@@ -248,10 +251,6 @@ class Sonarr(ExtArrService, ArrService):
                 ),
             ]
 
-        for addon in self.addons:
-            addon_buttons = addon.addon_buttons(parent=self, state=state)
-            rows_menu.append(addon_buttons)
-
         rows_action = []
         if in_library:
             if allow_edit:
@@ -326,7 +325,7 @@ class Sonarr(ExtArrService, ArrService):
         else:
             rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
 
-        return [row_navigation, *rows_menu, *rows_action]
+        return [row_navigation, ADDON_PLACEHOLDER, *rows_menu, *rows_action]
 
     def create_message(
             self, state: State, full_redraw=False, allow_edit=False
@@ -385,7 +384,7 @@ class Sonarr(ExtArrService, ArrService):
             ),
             tags=items[0].get("tags", []) if items else None,
             menu=None,
-            seasons=self._get_season_state(items[0]),
+            seasons=self._get_season_state(items[0] if items else None),
         )
 
     @repaint

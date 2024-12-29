@@ -50,12 +50,19 @@ class ArrService(TelegramHandler):
     api_url: str
     api_key: str
     api_version: str
-    service_content: ServiceContent = None
-    arr_variant: ArrVariant | str = None
-    addons: List['ArrService'] = []
+    service_content: ServiceContent
+    arr_variant: ArrVariant | str
+    addons: List['ArrService']
 
-    root_folders: List[str] = []
-    session_db: SessionDatabase = SessionDatabase()
+    root_folders: List[str]
+    session_db: SessionDatabase
+
+    def __init__(self):
+        self.service_content = None
+        self.arr_variant = None
+        self.root_folders = []
+        self.session_db = SessionDatabase()
+        self.addons = []
 
     def inject_addons(self, addons: List['ArrService']):
         for addon in addons:

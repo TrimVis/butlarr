@@ -3,8 +3,8 @@ from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
 from . import ArrService, ArrVariant, Action, ServiceContent
-from .ext import ExtArrService, Addon, ParentState
-from ..tg_handler import command, callback, handler
+from .addon import Addon
+from ..tg_handler import callback, handler
 from ..tg_handler.message import (
     Response,
     repaint,
@@ -19,7 +19,7 @@ from ..tg_handler.keyboard import Button, keyboard
 
 
 @dataclass(frozen=True)
-class State():
+class State:
     items: List[Any]
     index: int
     arr_variant: ArrVariant
@@ -27,21 +27,29 @@ class State():
     menu: Optional[
         Literal["list"] | Literal["download"]
     ]
-    parent: Optional[ParentState]
+    parent: Any
 
 
 @handler
-class Bazarr(ExtArrService, ArrService, Addon):
+class Bazarr(Addon):
     def __init__(
         self,
-        commands: List[str],
+        commands: List[ArrService],
         api_host: str,
         api_key: str,
         name: str,
     ):
-        self.commands = commands
+        if len(commands) != 0:
+            logger.error(
+                "Bazarr can only be used as an addon." +
+                " Ignoring the 'commands' provided"
+            )
+            commands = []
+        super().__init__()
+
         self.api_key = api_key
         self.name = name
+        self.commands = commands
 
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.SUBTITLES
@@ -51,7 +59,6 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
-
         row_navigation = []
         rows_menu = []
         rows_action = []
@@ -208,16 +215,10 @@ class Bazarr(ExtArrService, ArrService, Addon):
             state=state,
         )
 
-    @command(default=True)
-    @command(cmds=[("help", "", "Shows only the bazarr help page")])
-    async def cmd_help(self, update, context, args):
-        return await ExtArrService.cmd_help(self, update, context, args)
-
     @repaint
     @sessionState(init=True)
     @callback(cmds=["list"])
     @authorized(min_auth_level=AuthLevels.USER)
-    @Addon.load
     async def clbk_list(self, update, context, args, **kwargs):
         parent = kwargs.get('parent')
 
@@ -271,65 +272,53 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
         return self.create_message(state, full_redraw=False)
 
-    @Addon.load
-    def radarr_integration(self, item, buttons, **kwargs):
-        parent = kwargs.get('parent')
+    def addon_buttons(self, service, state):
+        item = state.items[state.index]
+
+        if ArrVariant(service.arr_variant) == ArrVariant.RADARR:
+            return self.radarr_integration(service, state, item)
+        elif ArrVariant(service.arr_variant) == ArrVariant.SONARR:
+            return self.sonarr_integration(service, state, item)
+
+        raise NotImplementedError(
+            f'{service.arr_variant} integration not implemented')
+
+    def radarr_integration(self, service, state, item, **kwargs):
         downloaded = True if "movieFile" in item else False
 
-        if not downloaded:
-            return
-
-        if parent.state.menu == "add":
+        if downloaded and state.menu == "add":
             movieId = item.get("id")
 
-            buttons.append(
+            return [
                 Button(
                     "🔍 Search for Subtitles",
                     self.get_clbk("list", movieId)
                 ),
-            )
+            ]
 
-    @Addon.load
-    def sonarr_integration(self, item, buttons, **kwargs):
-        parent = kwargs.get('parent')
+        return []
+
+    def sonarr_integration(self, service, state, item, **kwargs):
         in_library = "id" in item and item["id"]
 
-        if not in_library:
-            return
-
-        if parent.state.menu == "add":
-            buttons.append(
-                Button(
-                    "🔍 Search for Subtitles",
-                    parent.service.get_clbk("season_list")
-                ),
-            )
-
-        elif parent.state.menu == "episode":
-
+        if in_library and state.menu == "episode":
             episodeId = item['selectedEpisodeId']
-            episode = parent.service.get_episode(episodeId)
+            episode = service.get_episode(episodeId)
             downloaded = True if episode['hasFile'] else False
 
             if downloaded:
-                buttons.append(
+                return [
                     Button(
                         "🔍 Search for Subtitles",
                         self.get_clbk("list", episodeId)
                     ),
-                )
+                ]
+        elif in_library:
+            return [
+                Button(
+                    "🔍 Search for Subtitles",
+                    service.get_clbk("season_list")
+                ),
+            ]
 
-    @Addon.init
-    def addon_buttons(self, **kwargs):
-        parent = self.parent
-        item = parent.state.items[parent.state.index]
-
-        buttons = []
-        if ArrVariant(parent.service.arr_variant) == ArrVariant.RADARR:
-            self.radarr_integration(item, buttons)
-        elif ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
-            self.sonarr_integration(item, buttons)
-        else:
-            raise NotImplementedError(
-                f'{parent.service.arr_variant} integration not implemented')
-        return buttons
+        return []

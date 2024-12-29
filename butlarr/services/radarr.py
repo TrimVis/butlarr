@@ -1,8 +1,9 @@
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, ServiceContent, find_first
+from . import ArrVariant, ServiceContent, find_first
 from .ext import ExtArrService
+from .addon import ADDON_PLACEHOLDER, addon_buttons
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
@@ -32,7 +33,7 @@ class State:
 
 
 @handler
-class Radarr(ExtArrService, ArrService):
+class Radarr(ExtArrService):
     def __init__(
         self,
         commands: List[str],
@@ -40,6 +41,7 @@ class Radarr(ExtArrService, ArrService):
         api_key: str,
         name: str,
     ):
+        super().__init__()
         self.commands = commands
         self.api_key = api_key
         self.name = name
@@ -51,6 +53,7 @@ class Radarr(ExtArrService, ArrService):
         self.quality_profiles = self.get_quality_profiles()
 
     @keyboard
+    @addon_buttons
     def keyboard(self, state: State, allow_edit=False):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
@@ -168,11 +171,6 @@ class Radarr(ExtArrService, ArrService):
                 ),
             ]
 
-        for addon in self.addons:
-            addon_buttons = addon.addon_buttons(
-                parent=self, state=state, menu="addmenu")
-            rows_menu.append(addon_buttons)
-
         rows_action = []
         if in_library:
             if allow_edit:
@@ -218,7 +216,7 @@ class Radarr(ExtArrService, ArrService):
         else:
             rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
 
-        return [row_navigation, *rows_menu, *rows_action]
+        return [row_navigation, ADDON_PLACEHOLDER, *rows_menu, *rows_action]
 
     def create_message(
             self, state: State, full_redraw=False, allow_edit=False

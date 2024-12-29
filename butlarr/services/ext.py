@@ -21,6 +21,9 @@ class QueueState:
 
 @handler
 class ExtArrService(ArrService):
+    def __init__(self):
+        super().__init__()
+
     @keyboard
     def create_queue_keyboard(self, state: QueueState):
         total_pages = int(state.items["totalRecords"]) // state.page_size
@@ -128,51 +131,3 @@ Following commands are available:
         return await update.message.reply_text(
             response_message, parse_mode="Markdown"
         )
-
-
-@dataclass(frozen=True)
-class ParentState:
-    service: ArrService = None
-    state: any = None
-    menu: str = None
-
-
-class Addon:
-    parent: ParentState = None
-    supported_services = []
-
-    # Set the service and state that is loading this addon
-    def init(func):
-        @wraps(func)
-        def wrapped_func(self, *args, **kwargs):
-            service = kwargs.get('parent')
-            logger.debug(f'[Addon] Current service set: {service}')
-            state = kwargs.get('state')
-            logger.debug(f'[Addon] Current service state set: {state.index}')
-            menu = kwargs.get('menu')
-            logger.debug(f'[Addon] Return menu set: {menu}')
-
-            parent = ParentState(
-                service=service,
-                state=state,
-                menu=menu
-            )
-
-            self.parent = parent
-
-            return func(self, *args, **kwargs)
-
-        return wrapped_func
-
-    def load(func):
-        @wraps(func)
-        def wrapped_func(self, *args, **kwargs):
-            parent = {
-                'parent': self.parent
-            }
-            return func(self, *args, **parent, **kwargs)
-        return wrapped_func
-
-    @init
-    def addon_buttons(self, state, **kwargs):
-        raise NotImplementedError
