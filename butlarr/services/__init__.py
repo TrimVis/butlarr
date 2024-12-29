@@ -52,10 +52,21 @@ class ArrService(TelegramHandler):
     api_version: str
     service_content: ServiceContent = None
     arr_variant: ArrVariant | str = None
-    addons: []
+    addons: List['ArrService'] = []
 
     root_folders: List[str] = []
     session_db: SessionDatabase = SessionDatabase()
+
+    def inject_addons(self, addons: List['ArrService']):
+        for addon in addons:
+            if self.arr_variant in (addon.supported_services):
+                self.addons.append(addon)
+            else:
+                assert False, f"Unsupported addon service type {
+                    self.arr_variant}!"
+
+        logger.debug(f"Service '{self.name}' loaded addons: {
+                     str([a.name for a in addons])}")
 
     def _post(self, endpoint, params={}):
         return requests.post(
@@ -98,7 +109,7 @@ class ArrService(TelegramHandler):
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
 
-        logger.debug(r.content)
+        # logger.debug(r.content)
 
         if raw:
             return r
@@ -116,25 +127,27 @@ class ArrService(TelegramHandler):
         try:
             self.api_url = f"{api_host.rstrip('/')}/api/v3"
             status = self.request("system/status")
-            if not status:
+        except Exception:
+            pass
+
+        if not status:
+            try:
                 self.api_url = f"{api_host.rstrip('/')}/api"
                 status = self.request("system/status")
                 assert not status, \
                     "By default only v3 ArrServices are supported"
-        finally:
-            if status is None:
-                logger.error(
-                    f"Could not reach compatible api. Is the service ({
-                        self.api_url}) down? Is your API key correct?"
-                )
-                exit(1)
-            assert (
-                status
-            ), ("Could not reach compatible api. Is the service down? "
-                + "Is your API key correct?")
-            api_version = status.get("version", "")
-            assert api_version, "Could not find compatible api."
-            return api_version
+            except Exception:
+                pass
+
+        if not status:
+            logger.error(
+                f"Could not reach compatible api. Is the service ({
+                    self.api_url}) down? Is your API key correct?"
+            )
+            exit(1)
+        api_version = status.get("version", "")
+        assert api_version, "Could not find compatible api."
+        return api_version
 
     def get_media_caption(self, item, overview=True):
         caption = f"{item['title']} "

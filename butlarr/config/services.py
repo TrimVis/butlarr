@@ -19,47 +19,33 @@ def _constructor(service_type):
 
 
 def _load_services():
-    # Two step approach, due to addons requiering all
-    # services to be loaded beforehand
-    named_services = {}
+    service_addons = []
     for service in CONFIG["services"]:
 
         ServiceConstructor = _constructor(service["type"])
 
         api_config = APIS[service["api"]]
-        service_name = service.get("name")
 
         args = {
-            "name": service_name,
             "commands": service["commands"],
             "api_host": api_config["api_host"],
             "api_key": api_config["api_key"],
-            "addons": service.get("addons", []),
+            "name": service.get("name", service["commands"][0])
         }
 
-        service = ServiceConstructor(**args)
-        SERVICES.append(service)
+        SERVICES.append(ServiceConstructor(**args))
+        service_addons.append(service.get("addons", []))
 
-        if service_name:
-            assert service_name not in named_services, \
-                "Different services have been named the same!"
-            named_services[service_name] = service
+    for (service, addons) in zip(SERVICES, service_addons):
+        if not addons:
+            continue
 
-    for service in SERVICES:
-        logger.info(f"Loading {service.name} addons")
-        addons = []
-        for addon in service.addons:
-            addon_service = named_services[addon["service_name"]]
-            if service.arr_variant in (addon_service.supported_services):
-                addons.append(addon_service)
-                logger.info(f"Addon {addon_service.name} loaded")
-            else:
-                assert False, f"Unsupported addon service type {
-                    service.arr_variant}!"
-
-        service.addons = addons
-        logger.debug(f"{service.name} service loaded Addons: {
-                     str(service.addons)}")
+        logger.info(f"Injecting addons for '{service.name}'")
+        service.inject_addons([
+            s
+            for s in SERVICES
+            if s.name in addons
+        ])
 
 
 _load_services()

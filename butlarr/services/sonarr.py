@@ -49,11 +49,11 @@ class Sonarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-        name: str = None,
-        addons: List[ArrService] = []
+        name: str,
     ):
         self.commands = commands
         self.api_key = api_key
+        self.name = name
 
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.SERIES
@@ -61,9 +61,6 @@ class Sonarr(ExtArrService, ArrService):
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
-
-        self.name = name
-        self.addons = addons
 
     def _get_season_state(self, item):
         available_seasons = [e.get("seasonNumber")

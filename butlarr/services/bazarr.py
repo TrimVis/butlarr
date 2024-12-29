@@ -37,19 +37,17 @@ class Bazarr(ExtArrService, ArrService, Addon):
         commands: List[str],
         api_host: str,
         api_key: str,
-        name: str = None,
-        addons: List[ArrService] = []
+        name: str,
     ):
         self.commands = commands
         self.api_key = api_key
+        self.name = name
 
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.SUBTITLES
         self.arr_variant = ArrVariant.BAZARR
 
-        self.name = name
         self.supported_services = [ArrVariant.RADARR, ArrVariant.SONARR]
-        self.addons = addons
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
@@ -100,26 +98,25 @@ class Bazarr(ExtArrService, ArrService, Addon):
 
         return [row_navigation, *rows_menu, *rows_action]
 
+    # NOTE: Overwrite needed, as api_version will not be detected otherwise
     def detect_api(self, api_host):
         status = None
         # Detect version and api_url
         try:
             self.api_url = f"{api_host.rstrip('/')}/api"
             status = self.request("system/status")
-        finally:
-            if status is None:
-                logger.error(
-                    "Could not reach compatible api. Is the service down?"
-                    + " Is your API key correct?"
-                )
-                exit(1)
-            assert (
-                status
-            ), ("Could not reach compatible api. Is the service down?"
-                + " Is your API key correct?")
-            api_version = status.get("data", {}).get("bazarr_version", "")
-            assert api_version, "Could not find compatible api."
-            return api_version
+        except Exception:
+            pass
+
+        if not status:
+            logger.error(
+                f"Could not reach compatible api. Is the service ({
+                    self.api_url}) down? Is your API key correct?"
+            )
+            exit(1)
+        api_version = status.get("data", {}).get("bazarr_version", "")
+        assert api_version, "Could not find compatible api."
+        return api_version
 
     def search(self, arr_variant, id):
         if arr_variant == ArrVariant.RADARR:

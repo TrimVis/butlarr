@@ -185,17 +185,13 @@ apis:
 
 services:
   - type: "Radarr"
-    name: "radarr"
     commands: ["movie"]
     api: "movie"
-    addons:
-      - service_name: "bazarr"
+    addons: ["bazarr"]
   - type: "Sonarr"
-    name: "sonarr"
     commands: ["series"]
     api: "series"
-    addons:
-      - service_name: "bazarr"
+    addons: ["bazarr"]
   - type: "Bazarr"
     name: "bazarr"
     commands: ["subtitles"]

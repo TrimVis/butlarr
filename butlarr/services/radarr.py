@@ -38,20 +38,17 @@ class Radarr(ExtArrService, ArrService):
         commands: List[str],
         api_host: str,
         api_key: str,
-        name: str = None,
-        addons: List[ArrService] = []
+        name: str,
     ):
         self.commands = commands
         self.api_key = api_key
+        self.name = name
 
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.MOVIE
         self.arr_variant = ArrVariant.RADARR
         self.root_folders = self.get_root_folders()
         self.quality_profiles = self.get_quality_profiles()
-
-        self.name = name
-        self.addons = addons
 
     @keyboard
     def keyboard(self, state: State, allow_edit=False):
