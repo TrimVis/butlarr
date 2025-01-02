@@ -10,7 +10,7 @@ class Addon(ArrService):
     def __init__(self):
         super().__init__()
 
-    def addon_buttons(self, service, state):
+    def addon_buttons(self, service, state, **kwargs):
         raise NotImplementedError
 
 

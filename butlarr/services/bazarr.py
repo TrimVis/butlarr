@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 
 from . import ArrService, ArrVariant, Action, ServiceContent
 from .addon import Addon
+from ..config.services import find_service_by_name
 from ..tg_handler import callback, handler
 from ..tg_handler.message import (
     Response,
@@ -22,12 +23,13 @@ from ..tg_handler.keyboard import Button, keyboard
 class State:
     items: List[Any]
     index: int
-    arr_variant: ArrVariant
     media_id: int
     menu: Optional[
         Literal["list"] | Literal["download"]
     ]
-    parent: Any
+
+    parent_menu: Optional[str]
+    parent_service: ArrService
 
 
 @handler
@@ -41,10 +43,11 @@ class Bazarr(Addon):
     ):
         if len(commands) != 0:
             logger.error(
-                "Bazarr can only be used as an addon." +
+                "Bazarr can currently only be used as an addon." +
                 " Ignoring the 'commands' provided"
             )
-            commands = []
+
+        commands = [f"bazarr{abs(hash(api_host))}"]
         super().__init__()
 
         self.api_key = api_key
@@ -63,12 +66,13 @@ class Bazarr(Addon):
         rows_menu = []
         rows_action = []
 
-        parent = state.parent
-
+        # FIXME: Would be nice if back to non_parent also worked properly
+        back_to_parent = True
         if state.menu == 'list':
             if len(state.items) > 0:
                 row_navigation = [Button("=== Subtitles ===", "noop")]
             else:
+                back_to_parent = True
                 row_navigation = [Button("=== No subtitles found ===", "noop")]
 
             current_index = 0
@@ -89,16 +93,16 @@ class Bazarr(Addon):
                     break
 
         if state.menu == 'success':
+            back_to_parent = True
             row_navigation = [Button("Subtitle downloaded!", "noop")]
 
-        if parent.menu:
+        if back_to_parent and state.parent_menu:
             # Back to menu defined on "addon_buttons" function
             rows_action.append(
-                [Button("🔙 Back", parent.service.get_clbk(parent.menu))])
-        elif parent.state.menu:
-            # Back to current parent menu
-            rows_action.append(
-                [Button("🔙 Back", parent.service.get_clbk(parent.state.menu))])
+                [Button(
+                    "🔙 Back",
+                    state.parent_service.get_clbk(state.parent_menu)
+                )])
         elif state.menu:
             # back to current addon menu (not used yet)
             rows_action.append([Button("🔙 Back", self.get_clbk(state.menu))])
@@ -147,7 +151,6 @@ class Bazarr(Addon):
         assert item, "Missing required arg! You need to provide a item!"
 
         if service == ArrVariant.RADARR:
-
             method = 'providers/movies'
             params = {
                 "radarrid": id,
@@ -158,9 +161,7 @@ class Bazarr(Addon):
                 "subtitle": item.get('subtitle'),
                 **options
             }
-
         elif service == ArrVariant.SONARR:
-
             method = 'providers/episodes'
             params = {
                 "seriesid": item.get('id'),
@@ -172,7 +173,6 @@ class Bazarr(Addon):
                 "subtitle": item.get('subtitle'),
                 **options
             }
-
         else:
             logger.error(
                 f"Bazarr integration with service {service} is Not Implemented"
@@ -198,19 +198,19 @@ class Bazarr(Addon):
                 state=state,
             )
 
-        parent = state.parent
-
-        media_item = parent.state.items[parent.state.index]
-
-        if ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
-            reply_message = parent.service.episode_caption(media_item)
-        else:
-            reply_message = parent.service.get_media_caption(media_item)
+        # FIXME: Readd support for displaying the proper title
+        # parent = state.parent
+        # media_item = parent.state.items[parent.state.index]
+        # if ArrVariant(parent.service.arr_variant) == ArrVariant.SONARR:
+        #     reply_message = parent.service.episode_caption(media_item)
+        # else:
+        #     reply_message = parent.service.get_media_caption(media_item)
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
         return Response(
-            caption=reply_message,
+            # caption=reply_message,
+            caption="",
             reply_markup=keyboard_markup,
             state=state,
         )
@@ -220,23 +220,19 @@ class Bazarr(Addon):
     @callback(cmds=["list"])
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_list(self, update, context, args, **kwargs):
-        parent = kwargs.get('parent')
-
-        media_item = parent.state.items[parent.state.index]
-        media_id = media_item["id"] or args[1]
-
-        arr_variant = parent.service.arr_variant
-
-        items = self.search(arr_variant=arr_variant, id=media_id)
-
         state = State(
-            items=items,
+            items=[],
             index=0,
-            arr_variant=arr_variant,
-            media_id=media_id,
+            media_id=args[3],
             menu="list",
-            parent=parent
+            parent_menu=args[2],
+            parent_service=find_service_by_name(args[1])
         )
+
+        items = self.search(
+            arr_variant=state.parent_service.arr_variant, id=state.media_id)
+        state = replace(state, items=items)
+        print(items)
 
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.USER.value
@@ -249,12 +245,8 @@ class Bazarr(Addon):
     @sessionState(clear=True)
     @authorized(min_auth_level=AuthLevels.USER)
     async def clbk_add(self, update, context, args, state):
-
-        logger.debug(f"Return to menu {state.parent.state.menu}")
-
         state = replace(
             state,
-            index=0,
             menu="success",
         )
 
@@ -264,6 +256,7 @@ class Bazarr(Addon):
             item=state.items[state.index]
         )
 
+        # NOTE: What's up with this status_code?
         if result.status_code < 200 \
                 or result.status_code > 299:
             return Response(
@@ -272,53 +265,43 @@ class Bazarr(Addon):
 
         return self.create_message(state, full_redraw=False)
 
-    def addon_buttons(self, service, state):
+    def addon_buttons(self, service, state, **kwargs):
         item = state.items[state.index]
 
+        clbk = None
         if ArrVariant(service.arr_variant) == ArrVariant.RADARR:
-            return self.radarr_integration(service, state, item)
+            clbk = self._radarr_search_clbk(service, state, item)
         elif ArrVariant(service.arr_variant) == ArrVariant.SONARR:
-            return self.sonarr_integration(service, state, item)
+            clbk = self._sonarr_search_clbk(service, state, item)
+        else:
+            raise NotImplementedError(
+                f'{service.arr_variant} integration not implemented')
 
-        raise NotImplementedError(
-            f'{service.arr_variant} integration not implemented')
-
-    def radarr_integration(self, service, state, item, **kwargs):
-        downloaded = True if "movieFile" in item else False
-
-        if downloaded and state.menu == "add":
-            movieId = item.get("id")
-
-            return [
-                Button(
-                    "🔍 Search for Subtitles",
-                    self.get_clbk("list", movieId)
-                ),
-            ]
+        if clbk:
+            return [Button("🔍 Search for Subtitles", clbk), ]
 
         return []
 
-    def sonarr_integration(self, service, state, item, **kwargs):
+    def _radarr_search_clbk(self, service, state, item):
+        downloaded = True if "movieFile" in item else False
+
+        if downloaded or True:
+            return self.get_clbk("list", service.name,
+                                 state.menu or "goto", item.get("id"))
+
+        return None
+
+    def _sonarr_search_clbk(self, service, state, item):
         in_library = "id" in item and item["id"]
 
         if in_library and state.menu == "episode":
             episodeId = item['selectedEpisodeId']
             episode = service.get_episode(episodeId)
-            downloaded = True if episode['hasFile'] else False
+            downloaded = episode['hasFile']
 
             if downloaded:
-                return [
-                    Button(
-                        "🔍 Search for Subtitles",
-                        self.get_clbk("list", episodeId)
-                    ),
-                ]
+                return self.get_clbk("list", service.name,
+                                     state.menu or "goto", episodeId)
         elif in_library:
-            return [
-                Button(
-                    "🔍 Search for Subtitles",
-                    service.get_clbk("season_list")
-                ),
-            ]
-
+            return service.get_clbk("season_list")
         return []

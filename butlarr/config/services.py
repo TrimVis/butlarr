@@ -8,6 +8,14 @@ APIS = CONFIG["apis"]
 SERVICES = []
 
 
+def find_service_by_name(service_name):
+    for s in SERVICES:
+        if s.name == service_name:
+            return s
+
+    raise IndexError("Such a service does not exist")
+
+
 def _constructor(service_type):
     try:
         service_module = importlib.import_module(
@@ -19,9 +27,15 @@ def _constructor(service_type):
 # Keep the namespace clean
 
 
+# TODO: Add proper validation for all fields and api
 def _load_services():
     service_addons = []
     for service in CONFIG["services"]:
+        # FIXME: "name" can not be a required argument for bw compat
+        assert "name" in service, f"Missing 'name' field for '{
+            service['type']}'"
+        #  assert "commands" in service, f"Missing 'commands' field for '{
+        #      service['type']}'"
 
         ServiceConstructor = _constructor(service["type"])
 
@@ -31,10 +45,8 @@ def _load_services():
             "commands": service.get("commands", []),
             "api_host": api_config["api_host"],
             "api_key": api_config["api_key"],
-            "name": service.get("name", None)
+            "name": service["name"]
         }
-
-        assert args["name"], f"Missing 'name' field for '{service['type']}'"
 
         SERVICES.append(ServiceConstructor(**args))
         service_addons.append(service.get("addons", []))

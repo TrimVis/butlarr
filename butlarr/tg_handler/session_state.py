@@ -15,16 +15,17 @@ def sessionState(key_fn=default_session_state_key_fn, clear=False, init=False):
     def decorator(func):
 
         @wraps(func)
-        async def wrapped_func(self, update, context, *args, **kwargs):
+        async def wrapped_func(self, *args, **kwargs):
             # init calls do not need a state, as they will create it first
             if init:
-                return await func(self, update, context, *args, **kwargs)
+                return await func(self, *args, **kwargs)
 
             # get state
+            update = kwargs.get("update", args[0])
             key = key_fn(self, update)
             state = self.session_db.get_session_entry(key)
             result = await func(
-                self, update, context, *args, **kwargs, state=state
+                self, *args, **kwargs, state=state
             )
 
             if clear:

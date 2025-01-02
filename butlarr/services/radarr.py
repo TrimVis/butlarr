@@ -285,8 +285,9 @@ class Radarr(ExtArrService):
         items = self.lookup(title)
         state = self._get_initial_state(items)
 
+        key = default_session_state_key_fn(self, update)
         self.session_db.add_session_entry(
-            default_session_state_key_fn(self, update), state
+            key, state
         )
 
         auth_level = get_auth_level_from_message(self.db, update)
