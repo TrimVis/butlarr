@@ -4,7 +4,7 @@ from telegram.ext import Application
 
 from .database import Database
 from .config.secrets import TELEGRAM_TOKEN
-from .config.services import SERVICES 
+from .config.services import SERVICES
 from .tg_handler import get_clbk_handler, get_help_handler
 from .tg_handler.auth import get_auth_handler
 
@@ -18,7 +18,13 @@ def main():
     db = Database()
 
     logger.info('Creating bot...')
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    # v1.1 needed while this issue is open
+    # https://github.com/python-hyper/h2/issues/1199
+    application = Application.builder()\
+        .token(TELEGRAM_TOKEN)\
+        .http_version("1.1")\
+        .get_updates_http_version("1.1")\
+        .build()
 
     logger.info('Registering auth command...')
     application.add_handler(get_auth_handler(db))

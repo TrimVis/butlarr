@@ -5,7 +5,9 @@ import sqlite3
 from threading import Lock
 
 DEFAULT_PATH = os.path.join(
-    Path(os.path.dirname(os.path.realpath(__file__))).parent, "data", "db.sqlite"
+    Path(os.path.dirname(os.path.realpath(__file__))).parent,
+    "data",
+    "db.sqlite"
 )
 
 
@@ -76,7 +78,8 @@ class Database:
             raise
 
     def add_user(self, id, username, auth_level):
-        q = "INSERT OR REPLACE INTO users (id, username, auth_level) VALUES (?, ?, ?);"
+        q = "INSERT OR REPLACE INTO users (id, username, auth_level) " \
+            + "VALUES (?, ?, ?);"
         qa = (id, username, auth_level)
         (_, con) = self._execute_query(q, qa)
         con.commit()

@@ -1,16 +1,23 @@
-from dataclasses import dataclass
+import requests
 from loguru import logger
 from enum import Enum
-from typing import List, Tuple, Optional, Any
-import requests
+from typing import List
 from ..tg_handler import TelegramHandler
 from ..session_database import SessionDatabase
+
+
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except ValueError:
+        return False
 
 
 def find_first(elems, check, fallback=0):
     try:
         result = next(e for e in elems if check(e))
-    except:
+    except Exception:
         result = None
     finally:
         if not result:
@@ -28,12 +35,14 @@ class Action(Enum):
 class ServiceContent(Enum):
     MOVIE = "movie"
     SERIES = "series"
+    SUBTITLES = "subtitles"
 
 
 class ArrVariant(Enum):
     UNSUPPORTED = None
-    SONARR = "series"
     RADARR = "movie"
+    SONARR = "series"
+    BAZARR = "subtitles"
 
 
 class ArrService(TelegramHandler):
@@ -41,33 +50,62 @@ class ArrService(TelegramHandler):
     api_url: str
     api_key: str
     api_version: str
-    service_content: ServiceContent = None
-    arr_variant: ArrVariant | str = None
+    service_content: ServiceContent
+    arr_variant: ArrVariant | str
+    addons: List['ArrService']
 
-    root_folders: List[str] = []
-    session_db: SessionDatabase = SessionDatabase()
+    root_folders: List[str]
+    session_db: SessionDatabase
+
+    def __init__(self):
+        self.service_content = None
+        self.arr_variant = None
+        self.root_folders = []
+        self.session_db = SessionDatabase()
+        self.addons = []
+
+    def inject_addons(self, addons: List['ArrService']):
+        for addon in addons:
+            if self.arr_variant in (addon.supported_services):
+                self.addons.append(addon)
+            else:
+                assert False, f"Unsupported addon service type {
+                    self.arr_variant}!"
+
+        logger.debug(f"Service '{self.name}' loaded addons: {
+                     str([a.name for a in addons])}")
 
     def _post(self, endpoint, params={}):
         return requests.post(
-            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
+            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key},
+            json=params
         )
 
     def _put(self, endpoint, params={}):
         return requests.put(
-            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key}, json=params
+            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key},
+            json=params
         )
 
     def _get(self, endpoint, params={}):
         return requests.get(
-            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
+            f"{self.api_url}/{endpoint}",
+            params={"apikey": self.api_key, **params}
         )
 
     def _delete(self, endpoint, params={}):
         return requests.delete(
-            f"{self.api_url}/{endpoint}", params={"apikey": self.api_key, **params}
+            f"{self.api_url}/{endpoint}",
+            params={"apikey": self.api_key, **params}
         )
 
-    def request(self, endpoint: str, *, action=Action.GET, params={}, fallback=None):
+    def request(
+            self, endpoint: str, *, action=Action.GET,
+            params={}, fallback=None, raw=False
+    ):
+        if raw and fallback:
+            assert False, "Request response cannot be raw and have a fallback!"
+
         r = None
         if action == Action.GET:
             r = self._get(endpoint, params)
@@ -77,6 +115,11 @@ class ArrService(TelegramHandler):
             r = self._put(endpoint, params)
         elif action == Action.DELETE:
             r = self._delete(endpoint, params)
+
+        # logger.debug(r.content)
+
+        if raw:
+            return r
 
         if not r:
             return fallback
@@ -91,24 +134,46 @@ class ArrService(TelegramHandler):
         try:
             self.api_url = f"{api_host.rstrip('/')}/api/v3"
             status = self.request("system/status")
-            if not status:
+        except Exception:
+            pass
+
+        if not status:
+            try:
                 self.api_url = f"{api_host.rstrip('/')}/api"
                 status = self.request("system/status")
-                assert not status, "By default only v3 ArrServices are supported"
-        finally:
-            if status is None:
-                logger.error(
-                    f"Could not reach compatible api. Is the service ({self.api_url}) down? Is your API key correct?"
-                )
-                exit(1)
-            assert (
-                status
-            ), "Could not reach compatible api. Is the service down? Is your API key correct?"
-            api_version = status.get("version", "")
-            assert api_version, "Could not find compatible api."
-            return api_version
+                assert not status, \
+                    "By default only v3 ArrServices are supported"
+            except Exception:
+                pass
+
+        if not status:
+            logger.error(
+                f"Could not reach compatible api. Is the service ({
+                    self.api_url}) down? Is your API key correct?"
+            )
+            exit(1)
+        api_version = status.get("version", "")
+        assert api_version, "Could not find compatible api."
+        return api_version
+
+    def get_media_caption(self, item, overview=True):
+        caption = f"{item['title']} "
+        if item["year"] and str(item["year"]) not in item["title"]:
+            caption += f"({item['year']}) "
+
+        if item["runtime"]:
+            caption += f"{item['runtime']}min "
+
+        caption += f"- {item['status'].title()}"
+        if overview:
+            caption += f"\n\n{item.get('overview', '')}"
+
+        caption = caption[0:1024]
+        return caption
 
     def get_queue_item(self, id: int):
+        # FIXME: Check params for correctness
+        params = {}
         return self.request(
             f"queue/{id}",
             params=params,
@@ -117,9 +182,9 @@ class ArrService(TelegramHandler):
 
     def get_queue(self, page: int = None, page_size: int = None):
         params = {}
-        if page != None:
+        if page is not None:
             params["page"] = page
-        if page_size != None:
+        if page_size is not None:
             params["page_size"] = page_size
         return self.request(
             "queue",
@@ -127,11 +192,13 @@ class ArrService(TelegramHandler):
             fallback=[],
         )
 
-    def get_queue_details(self, movie_id: int = None, include_movie: bool = None):
+    def get_queue_details(
+            self, movie_id: int = None, include_movie: bool = None
+    ):
         params = {}
         if movie_id:
             params["movieId"] = movie_id
-        if include_movie != None:
+        if include_movie is not None:
             params["includeMovie"] = include_movie
         return self.request(
             "queue",
@@ -149,7 +216,8 @@ class ArrService(TelegramHandler):
     def list_(self):
         if not self.arr_variant:
             return NotImplementedError(
-                "Unsupported Arr variant. You have to implement your own search"
+                "Unsupported Arr variant. You have to "
+                + "implement your own search"
             )
 
         return self.request(f"{self.arr_variant.value}", fallback=[])
@@ -157,7 +225,8 @@ class ArrService(TelegramHandler):
     def lookup(self, term: str = None):
         if not self.arr_variant:
             return NotImplementedError(
-                "Unsupported Arr variant. You have to implement your own search"
+                "Unsupported Arr variant. You have to "
+                + "implement your own search"
             )
         if not term:
             return []

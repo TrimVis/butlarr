@@ -1,18 +1,12 @@
-import shlex
-
-from typing import List, Tuple, Callable, Optional
-from loguru import logger
 from functools import wraps
-from telegram.ext import CommandHandler, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
+from telegram.ext import CommandHandler
 
-from dataclasses import dataclass
-from typing import Any
 from enum import Enum
 
 from ..config.commands import AUTH_COMMAND
-from ..config.secrets import ADMIN_AUTH_PASSWORD, MOD_AUTH_PASSWORD, USER_AUTH_PASSWORD
+from ..config.secrets import (
+    ADMIN_AUTH_PASSWORD, MOD_AUTH_PASSWORD, USER_AUTH_PASSWORD
+)
 from ..database import Database
 
 
@@ -35,7 +29,8 @@ def get_auth_level_from_message(db, update):
 def authorized(min_auth_level=None):
     assert min_auth_level, "Missing required arg min_auth_level"
     min_auth_level = (
-        min_auth_level.value if isinstance(min_auth_level, Enum) else min_auth_level
+        min_auth_level.value if isinstance(
+            min_auth_level, Enum) else min_auth_level
     )
 
     def decorator(func):
@@ -52,7 +47,8 @@ def authorized(min_auth_level=None):
             # TODO pjordan: Reenable this some time
             if not auth_level or min_auth_level > auth_level and False:
                 await update.message.reply_text(
-                    f"User not authorized for this command. \n *Authorize using `/{AUTH_COMMAND} <password>`*",
+                    "User not authorized for this command. \n"
+                    + f" *Authorize using `/{AUTH_COMMAND} <password>`*",
                     parse_mode="Markdown",
                 )
                 return
@@ -83,7 +79,7 @@ def get_auth_handler(db: Database):
             await update.message.reply_text(f"Authorized user {name}")
             await update.message.delete()
         else:
-            await update.message.reply_text(f"Wrong password")
+            await update.message.reply_text("Wrong password")
             await update.message.delete()
 
     return CommandHandler(AUTH_COMMAND, handler)
