@@ -102,8 +102,10 @@ docker run -v ./config.yaml:/app/config.yaml  trimforce/butlarr:latest
 
 #### Quick Local Setup
 
-> This setup currently only supports Linux
+> This setup currently only supports Linux and Windows
 > If you are interested in running this on any other OS, please refer to the Docker and Docker Compose instructions
+
+##### Linux
 
 1. First, clone the repository and cd into it
 
@@ -114,7 +116,31 @@ docker run -v ./config.yaml:/app/config.yaml  trimforce/butlarr:latest
 2. Run start script
 
     ```bash
-    ./scripts/start_linux.sh
+    ./scripts/linux/start_linux.sh
+    ```
+
+This will do steps 2, 3, and 5 of the Manual Setup.
+
+
+##### Windows
+
+1. Ensure you can run scripts in powershell
+
+    ```Powershell
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+    ```
+
+
+2. First, clone the repository and cd into it
+
+    ```Powershell
+    git clone git@github.com:TrimVis/butlarr.git && cd butlarr
+    ```
+
+3. Run start script
+
+    ```Powershell
+    ./scripts/windows/start_windows.ps1
     ```
 
 This will do steps 2, 3, and 5 of the Manual Setup.
@@ -150,7 +176,7 @@ This will do steps 2, 3, and 5 of the Manual Setup.
 
 #### Automatic Configuration
 
-An automatic setup helper is available. You can run it by executing the `./scripts/autosetup_linux.sh` file from the repository directory.
+An automatic setup helper is available. You can run it by executing the `./scripts/linux/autosetup_linux.sh` or `/scripts/windows/autosetup_windows.ps1` file from the repository directory.
 
 If you are working with docker, use:
 
