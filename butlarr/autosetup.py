@@ -106,8 +106,8 @@ def create_config_yaml(
         "telegram": {"token": telegram_token},
         "auth_passwords": {
             "admin": admin_auth_password,
-            "mod": admin_auth_password,
-            "user": admin_auth_password,
+            "mod": mod_auth_password,
+            "user": user_auth_password,
         },
         "apis": {
             s.commands[0]: {"api_host": s.url, "api_key": s.api_key} for s in services
