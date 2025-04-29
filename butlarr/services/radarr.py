@@ -1,16 +1,17 @@
-from loguru import logger
 from typing import Optional, List, Any, Literal
 from dataclasses import dataclass, replace
 
-from . import ArrService, ArrVariant, Action, ServiceContent, find_first
-from .ext import ExtArrService, QueueState
+from . import ArrVariant, ServiceContent, find_first
+from .ext import ExtArrService
+from .addon import ADDON_PLACEHOLDER, addon_buttons
 from ..tg_handler import command, callback, handler
 from ..tg_handler.message import (
     Response,
     repaint,
     clear,
 )
-from ..tg_handler.auth import authorized, AuthLevels, get_auth_level_from_message
+from ..tg_handler.auth import (
+    authorized, AuthLevels, get_auth_level_from_message)
 from ..tg_handler.session_state import (
     sessionState,
     default_session_state_key_fn,
@@ -26,20 +27,24 @@ class State:
     tags: List[str]
     root_folder: str
     menu: Optional[
-        Literal["path"] | Literal["tags"] | Literal["quality_profile"] | Literal["add"]
+        Literal["path"] | Literal["tags"] |
+        Literal["quality_profile"] | Literal["add"]
     ]
 
 
 @handler
-class Radarr(ExtArrService, ArrService):
+class Radarr(ExtArrService):
     def __init__(
         self,
         commands: List[str],
         api_host: str,
         api_key: str,
+        name: str,
     ):
+        super().__init__()
         self.commands = commands
         self.api_key = api_key
+        self.name = name
 
         self.api_version = self.detect_api(api_host)
         self.service_content = ServiceContent.MOVIE
@@ -48,6 +53,7 @@ class Radarr(ExtArrService, ArrService):
         self.quality_profiles = self.get_quality_profiles()
 
     @keyboard
+    @addon_buttons
     def keyboard(self, state: State, allow_edit=False):
         item = state.items[state.index]
         in_library = "id" in item and item["id"]
@@ -61,13 +67,15 @@ class Radarr(ExtArrService, ArrService):
             rows_menu = [
                 [
                     Button(
-                        f"Change Quality   ({state.quality_profile.get('name', '-')})",
+                        f"Change Quality   ({
+                            state.quality_profile.get('name', '-')})",
                         self.get_clbk("quality", state.index),
                     ),
                 ],
                 [
                     Button(
-                        f"Change Path   ({state.root_folder.get('path', '-')})",
+                        f"Change Path   ({
+                            state.root_folder.get('path', '-')})",
                         self.get_clbk("path", state.index),
                     )
                 ],
@@ -144,13 +152,15 @@ class Radarr(ExtArrService, ArrService):
                 (
                     Button(
                         "TMDB",
-                        url=f"https://www.themoviedb.org/movie/{item['tmdbId']}",
+                        url=f"https://www.themoviedb.org/movie/{
+                            item['tmdbId']}",
                     )
                     if item.get("tmdbId", None)
                     else None
                 ),
                 (
-                    Button("IMDB", url=f"https://imdb.com/title/{item['imdbId']}")
+                    Button(
+                        "IMDB", url=f"https://imdb.com/title/{item['imdbId']}")
                     if item.get("imdbId", None)
                     else None
                 ),
@@ -167,31 +177,36 @@ class Radarr(ExtArrService, ArrService):
                 if state.menu != "add":
                     rows_action.append(
                         [
-                            Button(f"🗑 Remove", self.get_clbk("remove")),
-                            Button(f"✏️ Edit", self.get_clbk("addmenu")),
+                            Button("🗑 Remove", self.get_clbk("remove")),
+                            Button("✏️ Edit", self.get_clbk("addmenu")),
                         ]
                     )
                 else:
                     rows_action.append(
                         [
-                            Button(f"🗑 Remove", self.get_clbk("remove")),
-                            Button(f"✅ Submit", self.get_clbk("add", "no-search")),
+                            Button("🗑 Remove", self.get_clbk("remove")),
+                            Button("✅ Submit", self.get_clbk(
+                                "add", "no-search")),
                         ]
                     )
                     rows_action.append(
                         [
-                            Button(f"✅ + 🔍 Submit & Search", self.get_clbk("add", "search")),
+                            Button("✅ + 🔍 Submit & Search",
+                                   self.get_clbk("add", "search")),
                         ]
                     )
         else:
             if not state.menu:
-                rows_action.append([Button(f"➕ Add", self.get_clbk("addmenu"))])
+                rows_action.append(
+                    [Button("➕ Add", self.get_clbk("addmenu"))])
             elif state.menu == "add":
                 rows_action.append(
                     [
-                        Button(f"📺 Monitor", self.get_clbk("add", "no-search")),
+                        Button("📺 Monitor", self.get_clbk(
+                            "add", "no-search")),
                         Button(
-                            f"🔍 Monitor & Search", self.get_clbk("add", "search")
+                            "🔍 Monitor & Search", self.get_clbk(
+                                "add", "search")
                         ),
                     ]
                 )
@@ -201,9 +216,11 @@ class Radarr(ExtArrService, ArrService):
         else:
             rows_action.append([Button("❌ Cancel", self.get_clbk("cancel"))])
 
-        return [row_navigation, *rows_menu, *rows_action]
+        return [row_navigation, ADDON_PLACEHOLDER, *rows_menu, *rows_action]
 
-    def create_message(self, state: State, full_redraw=False, allow_edit=False):
+    def create_message(
+            self, state: State, full_redraw=False, allow_edit=False
+    ):
         if not state.items:
             return Response(
                 caption="No movies found",
@@ -214,15 +231,8 @@ class Radarr(ExtArrService, ArrService):
 
         keyboard_markup = self.keyboard(state, allow_edit=allow_edit)
 
-        reply_message = f"{item['title']} "
-        if item["year"] and str(item["year"]) not in item["title"]:
-            reply_message += f"({item['year']}) "
+        reply_message = self.get_media_caption(item)
 
-        if item["runtime"]:
-            reply_message += f"{item['runtime']}min "
-
-        reply_message += f"- {item['status'].title()}\n\n{item.get('overview', '')}"
-        reply_message = reply_message[0:1024]
         cover_url = item.get("remotePoster")
         if not cover_url and len(item.get("images")):
             cover_url = item.get("images")[0]["remoteUrl"]
@@ -233,7 +243,7 @@ class Radarr(ExtArrService, ArrService):
             reply_markup=keyboard_markup,
             state=state,
         )
-    
+
     def _get_initial_state(self, items):
         return State(
             items=items,
@@ -241,7 +251,8 @@ class Radarr(ExtArrService, ArrService):
             root_folder=(
                 find_first(
                     self.root_folders,
-                    lambda x: items[0].get("folderName").startswith(x.get("path")),
+                    lambda x: items[0].get(
+                        "folderName").startswith(x.get("path")),
                 )
                 if items
                 else None
@@ -274,13 +285,16 @@ class Radarr(ExtArrService, ArrService):
         items = self.lookup(title)
         state = self._get_initial_state(items)
 
+        key = default_session_state_key_fn(self, update)
         self.session_db.add_session_entry(
-            default_session_state_key_fn(self, update), state
+            key, state
         )
 
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
-        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
+        return self.create_message(
+            state, full_redraw=True, allow_edit=allow_edit
+        )
 
     @command(cmds=[("help", "", "Shows only the radarr help page")])
     async def cmd_help(self, update, context, args):
@@ -305,7 +319,9 @@ class Radarr(ExtArrService, ArrService):
 
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
-        return self.create_message(state, full_redraw=True, allow_edit=allow_edit)
+        return self.create_message(
+            state, full_redraw=True, allow_edit=allow_edit
+        )
 
     @repaint
     @callback(cmds=["queue"])
@@ -332,12 +348,16 @@ class Radarr(ExtArrService, ArrService):
     async def clbk_update(self, update, context, args, state):
         auth_level = get_auth_level_from_message(self.db, update)
         allow_edit = auth_level >= AuthLevels.MOD.value
-        # Prevent any changes from being made if in library and permission level below MOD
+        # Prevent any changes from being made if in library
+        # and permission level below MOD
         if args[0] in ["addtag", "remtag", "selectpath", "selectquality"]:
             item = state.items[state.index]
             if "id" in item and item["id"] and not allow_edit:
                 # Don't do anything, illegal operation
-                return Response(caption="You are missing the permissions for this operation.")
+                return Response(
+                    caption="You are missing the permissions "
+                    + "for this operation."
+                )
 
         full_redraw = False
         if args[0] == "goto":
@@ -349,7 +369,8 @@ class Radarr(ExtArrService, ArrService):
                     index=idx,
                     root_folder=find_first(
                         self.root_folders,
-                        lambda x: item.get("folderName").startswith(x.get("path")),
+                        lambda x: item.get(
+                            "folderName").startswith(x.get("path")),
                     ),
                     quality_profile=find_first(
                         self.quality_profiles,
@@ -366,7 +387,8 @@ class Radarr(ExtArrService, ArrService):
         elif args[0] == "addtag":
             state = replace(state, tags=[*state.tags, args[1]])
         elif args[0] == "remtag":
-            state = replace(state, tags=[t for t in state.tags if t != args[1]])
+            state = replace(
+                state, tags=[t for t in state.tags if t != args[1]])
         elif args[0] == "path":
             state = replace(state, menu="path")
         elif args[0] == "selectpath":
@@ -399,8 +421,9 @@ class Radarr(ExtArrService, ArrService):
         if not result:
             return Response(caption="Seems like something went wrong...")
 
-        return Response(caption="Movie updated!" if state.items[state.index].get("id")
-                                    else "Movie added!")
+        return Response(caption=("Movie updated!"
+                        if state.items[state.index].get("id")
+                        else "Movie added!"))
 
     @clear
     @callback(cmds=["cancel"])
