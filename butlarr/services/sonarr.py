@@ -32,12 +32,14 @@ class State:
     language_profile: str
     tags: List[str]
     root_folder: str
+    use_season_folder: bool
     seasons: SeasonState
     menu: Optional[
         Literal["path"]
         | Literal["tags"]
         | Literal["quality"]
         | Literal["language"]
+        | Literal["seasonfolder"]
         | Literal["add"]
     ]
 
@@ -57,6 +59,7 @@ class Sonarr(ExtArrService, ArrService):
         self.service_content = ServiceContent.SERIES
         self.arr_variant = ArrVariant.SONARR
         self.root_folders = self.get_root_folders()
+        self.use_season_folder = self._get_use_season_folder()
         self.quality_profiles = self.get_quality_profiles()
         self.language_profiles = self.get_language_profiles()
 
@@ -91,6 +94,12 @@ class Sonarr(ExtArrService, ArrService):
                     Button(
                         f"Change Path   ({state.root_folder.get('path', '-')})",
                         self.get_clbk("path", state.index),
+                    )
+                ],
+                [
+                    Button(
+                        f"Change Use Season Folders ({'✅' if state.use_season_folder else '❌'})",
+                        self.get_clbk("seasonfolder", state.index),
                     )
                 ],
                 [
@@ -181,6 +190,16 @@ class Sonarr(ExtArrService, ArrService):
                     )
                 ]
                 for p in self.language_profiles
+            ]
+        elif state.menu == "seasonfolder":
+            row_navigation = [Button("=== Change Season Folders ===")]
+            rows_menu = [
+                [
+                    Button(
+                        f"{'❌ Single Series Folder' if state.use_season_folder else '✅ Use Season Folders'}",
+                        self.get_clbk("selectuseseasonfolder", (not state.use_season_folder)),
+                    )
+                ]
             ]
         else:
             if in_library:
@@ -354,6 +373,7 @@ class Sonarr(ExtArrService, ArrService):
             tags=items[0].get("tags", []) if items else None,
             menu=None,
             seasons=self._get_season_state(items[0]),
+            use_season_folder=self._get_use_season_folder(items[0]),
         )
 
     @repaint
@@ -429,6 +449,8 @@ class Sonarr(ExtArrService, ArrService):
             "language",
             "selectlanguage",
             "addmenu",
+            "seasonfolder",
+            "selectuseseasonfolder",
         ]
     )
     @sessionState()
@@ -444,6 +466,7 @@ class Sonarr(ExtArrService, ArrService):
             "selectquality",
             "selectlanguage",
             "searchseason",
+            "selectuseseasonfolder",
         ]:
             item = state.items[state.index]
             if "id" in item and item["id"] and not allow_edit:
@@ -462,6 +485,7 @@ class Sonarr(ExtArrService, ArrService):
                         self.root_folders,
                         lambda x: item.get("folderName").startswith(x.get("path")),
                     ),
+                    use_season_folder=item.get("seasonFolder"),
                     quality_profile=find_first(
                         self.quality_profiles,
                         lambda x: item.get("qualityProfileId") == x.get("id"),
@@ -511,6 +535,12 @@ class Sonarr(ExtArrService, ArrService):
             state = replace(state, language_profile=language_profile, menu="add")
         elif args[0] == "addmenu":
             state = replace(state, menu="add")
+        elif args[0] == "seasonfolder":
+            state = replace(state, menu="seasonfolder")
+        elif args[0] == "selectuseseasonfolder":
+            use_season_folder = eval(args[1])
+            state = replace(state, use_season_folder=use_season_folder, menu="add")
+
 
         return self.create_message(
             state, full_redraw=full_redraw, allow_edit=allow_edit
@@ -528,6 +558,7 @@ class Sonarr(ExtArrService, ArrService):
             root_folder_path=state.root_folder.get("path", ""),
             tags=state.tags,
             options={
+                "seasonFolder": state.use_season_folder,
                 "addOptions": {
                     "searchForMissingEpisodes": args[1] == "search",
                     "monitor": "none" if args[1] == "no-monitor" else "all",
@@ -559,3 +590,9 @@ class Sonarr(ExtArrService, ArrService):
     async def clbk_remove(self, update, context, args, state):
         self.remove(id=state.items[state.index].get("id"))
         return Response(caption="Series removed!")
+
+    def _get_use_season_folder(self, item: Any = None) -> bool:
+        if item is not None:
+            return eval(item.get("seasonFolder", "True"))
+        else:
+            return True
