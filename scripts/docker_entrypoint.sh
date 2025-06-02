@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 if [ "$BUTLARR_INTERACTIVE_SETUP" = "true" ]; then
     # Run interactive setup
