@@ -593,6 +593,6 @@ class Sonarr(ExtArrService, ArrService):
 
     def _get_use_season_folder(self, item: Any = None) -> bool:
         if item is not None:
-            return eval(item.get("seasonFolder", "True"))
+            return eval(str(item.get("useSeasonFolder", str(self.use_season_folder))))
         else:
-            return True
+            return self.use_season_folder
