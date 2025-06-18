@@ -7,7 +7,9 @@ SERVICES = []
 
 for service in CONFIG["services"]:
     try:
-        service_module = importlib.import_module(f"butlarr.services.{service['type'].lower()}")
+        service_module = importlib.import_module(
+            f"butlarr.services.{service['type'].lower()}"
+        )
         ServiceConstructor = getattr(service_module, service["type"])
     except Exception:
         assert False, "Could not find a module for that service"
