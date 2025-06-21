@@ -97,6 +97,10 @@ def load_config_from_env():
     _inject_api_conf(config)
     _inject_service_conf(config)
 
+    # Clean up commands, to not include empty elements
+    for s in config["services"]:
+        s["commands"] = list(filter(bool, s["commands"]))
+
     return config
 
 
@@ -108,6 +112,7 @@ def load_config():
     )
     if use_env_config:
         if config := load_config_from_env():
+            logger.debug(config)
             return config
 
     return load_config_from_file()
