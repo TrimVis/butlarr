@@ -55,14 +55,15 @@ def check_url(text):
 def service_setup(hide_done=False):
     print("What kind of service would you like to setup?")
     print("Options:")
-    for i, s in list(enumerate(SERVICES))[(1 if hide_done else 0) :]:
+    for i, s in list(enumerate(SERVICES))[(1 if hide_done else 0):]:
         print(f" {i} - {s}")
 
     service = None
     while not service:
         try:
             service_id = int(
-                input(f"Input your selection [{'1' if hide_done else '0'}-2]:  ")
+                input(f"Input your selection [{
+                      '1' if hide_done else '0'}-2]:  ")
             )
             service = SERVICES[service_id]
             if service == "done":
@@ -87,11 +88,14 @@ def service_setup(hide_done=False):
     print("(e.g. /series, /movies")
     while not (cmd := check_cmd(input("Command:  ").strip())):
         print(
-            "Your input is not a valid command. No whitespace inside a command allowed"
+            "Your input is not a valid command. "
+            + "No whitespace inside a command allowed"
         )
     assert cmd, "No command found"
 
-    return Service([cmd], service[0].upper() + service[1:], service, url, api_key)
+    return Service(
+        [cmd], service[0].upper() + service[1:], service, url, api_key
+    )
 
 
 def create_config_yaml(
@@ -110,7 +114,8 @@ def create_config_yaml(
             "user": user_auth_password,
         },
         "apis": {
-            s.commands[0]: {"api_host": s.url, "api_key": s.api_key} for s in services
+            s.commands[0]: {"api_host": s.url, "api_key": s.api_key}
+            for s in services
         },
         "services": [
             {
@@ -152,7 +157,8 @@ def main():
         new_services.append(s)
 
     print(
-        "If you continue, your inputs will be written out. The current config file will be overwritten!"
+        "If you continue, your inputs will be written out. "
+        + "The current config file will be overwritten!"
     )
     print(f"Make sure to back up {config_file} if you want to keep them.")
     if input("Do you want to continue? (y/n)  ").strip().lower() != "y":
@@ -182,7 +188,8 @@ def main():
         config_file=config_file,
     )
 
-    print("All config files have been succesfully created. Your bot should be setup.")
+    print("All config files have been succesfully created. " +
+          "Your bot should be setup.")
     print("You can start the bot by using one of the start scripts:")
     for f in os.listdir(f"{base_path}/scripts"):
         if f.startswith("start_"):
