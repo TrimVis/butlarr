@@ -7,7 +7,7 @@ from functools import wraps
 from telegram.ext import CommandHandler, CallbackQueryHandler
 from typing import TypeAlias
 
-from ..config.commands import AUTH_COMMAND, HELP_COMMAND
+from ..config.commands import AUTH_COMMAND, HELP_COMMAND, START_COMMAND
 from ..config.secrets import ADMIN_AUTH_PASSWORD
 from ..database import Database
 
@@ -42,8 +42,7 @@ CmdDescription: TypeAlias = str  # Help text: Description of command
 Cmd: TypeAlias = CmdStr | Tuple[CmdStr, CmdPattern, CmdDescription]
 
 
-
-def get_help_handler(services):
+def get_help_handler_fn(services):
     response_message = f"""
 Welcome to *butlarr*! \n
 *butlarr* is a bot that helps you interact with various _arr_ services. \n
@@ -62,7 +61,15 @@ After doing so you can interact with the various services using:
     async def handler(update, context):
         await update.message.reply_text(response_message, parse_mode="Markdown")
 
-    return CommandHandler(HELP_COMMAND, handler)
+    return handler
+
+
+def get_common_handlers(services):
+    help_handler = get_help_handler_fn(services)
+    return [
+        CommandHandler(HELP_COMMAND, help_handler),
+        CommandHandler(START_COMMAND, help_handler),
+    ]
 
 
 def get_clbk_handler(services):
