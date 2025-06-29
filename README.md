@@ -39,8 +39,7 @@ E.g., if you configured Sonarr on the `series` command, use:
 
 ## Basic Usage
 
-After following the *Setup* and *Configuration*, ensure the bot is running.
-If not, you can start it using: `python -m butlarr` from the repository directory.
+After following the [Setup](#setup) and [Configuration](#configuration), ensure the bot is running.
 Open the telegram chat to the bot and authorize yourself using your previously set `AUTH_PASSWORD`:
 
 ```bash
@@ -57,35 +56,32 @@ To add a movie, for example, you could send `/movie Alvin`
 
 ### Setup
 
+Butlarr can be configured a number of different ways, refere to these corresponding sections to learn more on these configuration methods:
+- Interactively using the [Interactive Setup](#automatic-configuration)
+- Manually using [Environment Variables](#environment-variables)
+- Manually using a [Configuration File](#configuration-file)
+
 #### Docker
 
-1. Configure butlarr (see *Configuration* for manual configuration)
+##### Interactive Setup
+1. Run the automatic setup: `docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest`
+2. Start the container `docker run trimforce/butlarr:latest`
 
-    ```bash
-    docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
-    ```
-
-2. Run the container
-
-    ```bash
-    docker run trimforce/butlarr:latest
-    ```
-
-You can also use map your own configuration file into the container by running the command below instead of 2:
+##### Environment Variables
+```bash
+docker run -e BUTLARR_USE_ENV_CONFIG=true -e [OTHER_VARIABLE]=[OTHER_VALUE] trimforce/butlarr:latest
 ```
+
+##### Configuration File
+```bash
 docker run -v ./config.yaml:/app/config.yaml  trimforce/butlarr:latest 
 ```
 
 #### Docker Compose
 
-1. Configure butlarr (see *Configuration* for manual configuration)
-
-    ```bash
-    docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
-    ```
-
+##### Interactive Setup
+1. Run the automatic setup: `docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest`
 2. Copy over/Create a new `docker-compose.yml` file with content:
-
     ```yaml
     services:
         butlarr:
@@ -99,6 +95,41 @@ docker run -v ./config.yaml:/app/config.yaml  trimforce/butlarr:latest
             - BUTLARR_INTERACTIVE_SETUP=false
             restart: unless-stopped
     ```
+
+##### Environment Variables
+```yaml
+services:
+    butlarr:
+        container_name: butlarr
+        image: trimforce/butlarr:latest
+        volumes:
+        - ./data:/app/data
+        environment:
+        - BUTLARR_INTERACTIVE_SETUP=false
+        - BUTLARR_USE_ENV_CONFIG=true
+        - TELEGRAM_BOT_TOKEN="<YOUR_TELEGRAM_TOKEN>"
+        - BUTLARR_ADMIN_PASSWORD="<SECURE_UNIQUE_PASSWORD>"
+        - BUTLARR_MOD_PASSWORD="<SECURE_UNIQUE_PASSWORD>"
+        - BUTLARR_USER_PASSWORD="<SECURE_UNIQUE_PASSWORD>"
+        - ...
+        restart: unless-stopped
+```
+
+
+##### Configuration File
+```yaml
+services:
+    butlarr:
+        container_name: butlarr
+        image: trimforce/butlarr:latest
+        volumes:
+        - ./data:/app/data
+        - ./config.yaml:/app/config.yaml
+        environment:
+        - BUTLARR_CONFIG_FILE=./config.yaml
+        - BUTLARR_INTERACTIVE_SETUP=false
+        restart: unless-stopped
+```
 
 #### Quick Local Setup
 
@@ -165,7 +196,7 @@ This will do steps 2, 3, and 5 of the Manual Setup.
     python -m venv venv && source venv/bin/activate
     ```
 
-4. Configure butlarr (see *Configuration*)
+4. Configure butlarr (see [Configuration](#configuration))
 5. Start the service
 
     ```bash
@@ -178,43 +209,21 @@ This will do steps 2, 3, and 5 of the Manual Setup.
 
 An automatic setup helper is available. You can run it by executing the `./scripts/linux/autosetup_linux.sh` or `/scripts/windows/autosetup_windows.ps1` file from the repository directory.
 
-If you are working with docker, use:
-
-```bash
-docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest
-```
+If you are working with docker, use: `docker run -it -e BUTLARR_INTERACTIVE_SETUP=true trimforce/butlarr:latest`
 
 #### Manual Configuration
 
+There are two ways to manually configure *Bazarr*, either use a `config.yaml` file for configuration, or alternatively configure your instance via environment variables.
+
+##### Configuration File
 After cloning the repository and `cd`ing into the repository, create a new file at `config.yaml`.
-Paste and adapt the following template `templates/config.yaml`:
+Paste and adapt the template [templates/config.yaml](./templates/config.yaml)
 
-```yaml
-telegram: 
-  token: "<YOUR_TELEGRAM_TOKEN>"
+##### Environment Variables
+Ensure that the `BUTLARR_USE_ENV_CONFIG` environment variable is set to either `true` or `1`.
+For a detailed description on how services are configured using environment variables, refer to the [env config template](./templates/config.env).
 
-auth_passwords:
-  admin: "<SECURE_UNIQUE_PASSWORD>"
-  mod: "<SECURE_UNIQUE_PASSWORD>"
-  user: "<SECURE_UNIQUE_PASSWORD>"
-
-apis:
-  movie:
-    api_host: "<HOST_API_0>"
-    api_key: "<API_KEY_0>"
-  series:
-    api_host: "<HOST_API_1>"
-    api_key: "<API_KEY_1>"
-
-services:
-  - type: "Radarr"
-    commands: ["movie"]
-    api: "movie"
-  - type: "Sonarr"
-    commands: ["series"]
-    api: "series"
-```
-
+##### Roles
 There are 3 unique roles available: admin, mod, and user.
 A user can only add movies but cannot remove or edit existing entries.
 A mod can do both of these.
@@ -252,10 +261,3 @@ You can find a template at: `templates/butlarr.service`
 
 Start it using: `systemctl --user start butlarr`
 Enable it to start on reboots using: `systemctl --user enable butlarr`
-
-## Open TODOs
-
-- [ ] Create a pip package
-- [ ] Add more permission levels
-
-> Developed by TrimVis.
